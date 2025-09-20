@@ -1,0 +1,38 @@
+// unsafe fn memcopy(src: usize, dst: usize, size: u16) {
+//   add(end, src, size);
+//   
+//   'word:
+//     sub(diff, end, src);
+//     blt(diff, 4, 'byte);
+//     
+//     lw(buf, 0, src);
+//     sw(buf, 0, dst);
+//     
+//     addi(src, src, 4);
+//     addi(dst, dst, 4);
+//     beq(src, end, 'end);
+//     j('word);
+//     
+//   'byte:
+//     lb(buf, 0, src);
+//     sb(buf, 0, dst);
+//     
+//     addi(src, src, 1);
+//     addi(dst, dst, 1);
+//     bne(src, end, 'byte);
+//     
+//   'end:
+//  
+//   ret();
+// }
+
+fn main() {
+  let a = 1;
+  // print_int(1)
+  // let a = 1;
+  // let b = 2;
+
+  // add(x, y)
+}
+
+// vim: ft=rs
