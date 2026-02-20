@@ -3,10 +3,7 @@ use std::ops::ControlFlow;
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::generator::{
-    AnalyzeImmInvalid, AnalyzeInsNotExist, AnalyzeOffsetInvalid, AnalyzeRegInvalid,
-};
-use crate::nodes::{AnalyzeMissingSemicolon, AnalyzeWhileConditionError};
+use crate::{generator, nodes};
 
 pub type AnalyzeResult = ControlFlow<(), ()>;
 
@@ -50,22 +47,25 @@ pub trait Analyze {
 pub enum AnalyzeError {
     #[error(transparent)]
     #[diagnostic(transparent)]
-    InsNotExist(#[from] AnalyzeInsNotExist),
+    InsNotExist(#[from] generator::AnalyzeInsNotExist),
     #[error(transparent)]
     #[diagnostic(transparent)]
-    ImmInvalid(#[from] AnalyzeImmInvalid),
+    ImmInvalid(#[from] generator::AnalyzeImmInvalid),
     #[error(transparent)]
     #[diagnostic(transparent)]
-    MissingSemicolon(#[from] AnalyzeMissingSemicolon),
+    MissingSemicolon(#[from] nodes::AnalyzeMissingSemicolon),
     #[error(transparent)]
     #[diagnostic(transparent)]
-    OffsetInvalid(#[from] AnalyzeOffsetInvalid),
+    OffsetInvalid(#[from] generator::AnalyzeOffsetInvalid),
     #[error(transparent)]
     #[diagnostic(transparent)]
-    RegInvalid(#[from] AnalyzeRegInvalid),
+    RegInvalid(#[from] generator::AnalyzeRegInvalid),
     #[error(transparent)]
     #[diagnostic(transparent)]
-    WhileConditionError(#[from] AnalyzeWhileConditionError),
+    RegNotFound(#[from] generator::AnalyzeRegNotFound),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    WhileConditionError(#[from] nodes::AnalyzeWhileConditionError),
 }
 
 impl<T: Analyze> Analyze for Vec<T> {

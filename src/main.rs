@@ -36,5 +36,5 @@ fn main() {
     let buf = ast.generated();
 
     println!("{buf:#?}");
-    println!("{buf}");
+    println!("{buf:#}");
 }

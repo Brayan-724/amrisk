@@ -25,7 +25,7 @@ pub struct GenerateCtx {
     vars: Vec<(Ident, usize)>,
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct GenerateBuf {
     buf: Vec<Instruction>,
     ctx: GenerateCtx,
@@ -87,6 +87,12 @@ impl GenerateBuf {
             self.buf.push(ins);
         }
     }
+
+    pub fn get_stack(&self, name: &str) -> Option<usize> {
+        self.stack
+            .iter()
+            .find_map(|(var, offset)| (&**var == name).then_some(*offset))
+    }
 }
 
 impl fmt::Display for GenerateBuf {
@@ -98,8 +104,17 @@ impl fmt::Display for GenerateBuf {
             if let Some(label) = next_label
                 && label.1 == idx
             {
+                if f.alternate() {
+                    f.write_str("\x1b[1;38;5;171m")?;
+                }
+
                 f.write_str(&*label.0)?;
                 f.write_str(":\n")?;
+
+                if f.alternate() {
+                    f.write_str("\x1b[0m")?;
+                }
+
                 next_label = labels.next();
             }
 
@@ -115,8 +130,8 @@ impl fmt::Display for GenerateBuf {
 pub trait Generate {
     fn generate(&self, buf: &mut GenerateBuf);
 
-    fn generated(&self, ctx: GenerateCtx) -> GenerateBuf {
-        let mut buf = GenerateBuf::new(ctx);
+    fn generated(&self) -> GenerateBuf {
+        let mut buf = GenerateBuf::default();
 
         self.generate(&mut buf);
 

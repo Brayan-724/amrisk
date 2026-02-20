@@ -67,9 +67,10 @@ macro_rules! instructions {
         impl fmt::Display for Instruction {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self {
-                    $(instructions!(@args-indexed [$name] [$($arg),*]) =>
-                        f.write_fmt(instructions!(@args-format [$ins] [$($alias)?] [$($arg),*])),
-                    )*
+                    $(instructions!(@args-indexed [$name] [$($arg),*]) => {
+                        let inst = instructions!(@aliasing [$ins] [$($alias)?]);
+                        instructions!(@args-format [f] [inst] [$($arg),*])
+                    })*
                     _ => Ok(())
                 }
             }
@@ -135,8 +136,8 @@ macro_rules! instructions {
     ( @count [$_:ident] ) => {1};
     ( @count [$_:ident, $($__:tt)*] ) => {1 + instructions!(@count [$($__)*])};
 
-    ( @arg-ty [immediate] ) => {i32};
-    ( @arg-ty [imm] ) => {i32};
+    ( @arg-ty [immediate] ) => {Imm};
+    ( @arg-ty [imm] ) => {Imm};
     ( @arg-ty [csr] ) => {Register};
     ( @arg-ty [rs] ) => {Register};
     ( @arg-ty [rt] ) => {Register};
@@ -144,8 +145,8 @@ macro_rules! instructions {
     ( @arg-ty [symbol] ) => {Offset};
     ( @arg-ty [offset] ) => {Offset};
 
-    ( @arg-from [$s:ident] [immediate] [$e:expr] ) => {Offset::imm_from_expr($e, $s)?};
-    ( @arg-from [$s:ident] [imm] [$e:expr]) => {Offset::imm_from_expr($e, $s)?};
+    ( @arg-from [$s:ident] [immediate] [$e:expr] ) => {Imm::from_expr($e, $s)?};
+    ( @arg-from [$s:ident] [imm] [$e:expr]) => {Imm::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [csr] [$e:expr]) => {Register::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [rs] [$e:expr]) => {Register::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [rt] [$e:expr]) => {Register::from_expr($e, $s)?};
@@ -153,8 +154,8 @@ macro_rules! instructions {
     ( @arg-from [$s:ident] [symbol] [$e:expr]) => {Offset::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [offset] [$e:expr]) => {Offset::from_expr($e, $s)?};
 
-    ( @arg-mock [immediate] ) => {0};
-    ( @arg-mock [imm] ) => {0};
+    ( @arg-mock [immediate] ) => {Imm(0)};
+    ( @arg-mock [imm] ) => {Imm(0)};
     ( @arg-mock [csr] ) => {Register::Zero};
     ( @arg-mock [rs] ) => {Register::Zero};
     ( @arg-mock [rt] ) => {Register::Zero};
@@ -205,15 +206,42 @@ macro_rules! instructions {
         Self::$s(instructions!(@arg-offset [$rhs] [$_] [$_]), instructions!(@arg-offset [$rhs] [$__] [$__]), instructions!(@arg-offset [$rhs] [$___] [$___]))
     };
 
-    ( @args-format [$s:ident] [$($alias:tt)?] [] ) => {format_args!("{}", instructions!(@aliasing [$s] [$($alias)?]))};
-    ( @args-format [$s:ident] [$($alias:tt)?] [$_:ident] ) => {
-        format_args!("{} {}", instructions!(@aliasing [$s] [$($alias)?]), $_)
+    ( @args-format [$f:ident] [$s:ident] [] ) => {
+        if $f.alternate() {
+            $f.write_fmt(format_args!("\x1b[1;38;5;213m{:<4}\x1b[0m", $s))
+        } else {
+            $f.write_fmt(format_args!("{}", $s))
+        }
     };
-    ( @args-format [$s:ident] [$($alias:tt)?] [$_:ident, $__:ident] ) => {
-        format_args!("{} {}, {}", instructions!(@aliasing [$s] [$($alias)?]), $_, $__)
+    ( @args-format [$f:ident] [$s:ident] [$_:ident] ) => {
+        if $f.alternate() {
+            $f.write_fmt(format_args!("\x1b[1;38;5;211m{:<4}\x1b[0m ", $s))?;
+            $_.fmt($f)
+        } else {
+            $f.write_fmt(format_args!("{} {}", $s, $_))
+        }
     };
-    ( @args-format [$s:ident] [$($alias:tt)?] [$_:ident, $__:ident, $___:ident] ) => {
-        format_args!("{} {}, {}, {}", instructions!(@aliasing [$s] [$($alias)?]), $_, $__, $___)
+    ( @args-format [$f:ident] [$s:ident] [$_:ident, $__:ident] ) => {
+        if $f.alternate() {
+            $f.write_fmt(format_args!("\x1b[1;38;5;177m{:<4}\x1b[0m ", $s))?;
+            $_.fmt($f)?;
+            $f.write_str(", ")?;
+            $__.fmt($f)
+        } else {
+            $f.write_fmt(format_args!("{} {}, {}", $s, $_, $__))
+        }
+    };
+    ( @args-format [$f:ident] [$s:ident] [$_:ident, $__:ident, $___:ident] ) => {
+        if $f.alternate() {
+            $f.write_fmt(format_args!("\x1b[1;38;5;176m{:<4}\x1b[0m ", $s))?;
+            $_.fmt($f)?;
+            $f.write_str(", ")?;
+            $__.fmt($f)?;
+            $f.write_str(", ")?;
+            $___.fmt($f)
+        } else {
+            $f.write_fmt(format_args!("{} {}, {}, {}", $s, $_, $__, $___))
+        }
     };
 
     ( @aliasing [$s:ident] [($($alias:tt)+)] ) => {stringify!($($alias)+)};

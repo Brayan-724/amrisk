@@ -3,7 +3,7 @@ use std::fmt::{self, Write as _};
 use amrisk_macros::Node;
 
 use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
-use crate::generator::{Generate, GenerateBuf, Instruction, Offset, Register};
+use crate::generator::{Generate, GenerateBuf, Imm, Instruction, Offset, Register};
 use crate::nodes::{Block, Ident};
 use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
@@ -64,7 +64,7 @@ impl Generate for ItemFunction {
         buf.push(Instruction::Addi(
             Register::Stack,
             Register::Stack,
-            -stack_size,
+            Imm(-stack_size),
         ));
 
         // Save return pointer
@@ -87,7 +87,7 @@ impl Generate for ItemFunction {
         buf.push(Instruction::Addi(
             Register::Stack,
             Register::Stack,
-            stack_size,
+            Imm(stack_size),
         ));
 
         buf.push(Instruction::Ret());

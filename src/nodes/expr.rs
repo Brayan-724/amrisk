@@ -4,7 +4,7 @@ use std::fmt;
 use amrisk_macros::Node;
 
 use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
-use crate::generator::{Generate, GenerateBuf, Instruction, Register};
+use crate::generator::{Generate, GenerateBuf, Imm, Instruction, Offset, Register};
 use crate::nodes::{Block, Ident};
 use crate::parser::{IntoSpanned, Span, Spanned};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
@@ -163,8 +163,15 @@ impl Generate for Expr {
     fn generate(&self, buf: &mut GenerateBuf) {
         match self {
             Expr::Assign(var, expr) => {
-                buf;
-                buf.push(Instruction::Li(Register::Result, ()));
+                if let Some(offset) = buf.get_stack(var.0.as_ref()) {
+                    expr.borrow().generate(buf);
+
+                    buf.push(Instruction::Sw(
+                        Register::Result,
+                        Offset::Imm(-(offset as i32)),
+                        Register::Stack,
+                    ));
+                }
             }
             Expr::Ident(spanned) => todo!(),
             Expr::Block(block) => todo!(),
@@ -174,7 +181,7 @@ impl Generate for Expr {
                     buf.push(Instruction::Addi(
                         Register::Result,
                         Register::Result,
-                        n.value,
+                        Imm(n.value),
                     ));
                 }
                 (ExprBinary::Add, Expr::Number(n), expr) => {
@@ -182,7 +189,7 @@ impl Generate for Expr {
                     buf.push(Instruction::Addi(
                         Register::Result,
                         Register::Result,
-                        -n.value,
+                        Imm(-n.value),
                     ));
                 }
                 _ => {}
@@ -192,7 +199,7 @@ impl Generate for Expr {
                 buf.label_here(&*l.value);
             }
             Expr::Number(n) => {
-                buf.push(Instruction::Li(Register::Result, n.value));
+                buf.push(Instruction::Li(Register::Result, Imm(n.value)));
             }
         }
     }
