@@ -4,21 +4,36 @@ mod statements;
 
 pub use expr::*;
 pub use items::*;
+use miette::Diagnostic;
 pub use statements::*;
+use thiserror::Error;
 
 use std::fmt::{self, Write as _};
+use std::ops;
+use std::rc::Rc;
 
 use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
-use crate::parser::{IntoSpanned, PrettyFormatter, PrettyPrint, Span, Spanned, Token};
+use crate::generator::Generate;
+use crate::parser::{IntoSpanned, Span, Spanned, Token};
+use crate::pretty::{PrettyFormatter, PrettyPrint};
 
 /// Identificator of functions or variables
-#[derive(Debug, Clone)]
-pub struct Ident(pub String);
+#[derive(Debug, Clone, Hash)]
+#[repr(transparent)]
+pub struct Ident(pub Rc<str>);
 
 impl PrettyPrint for Ident {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.write_str(&self.0)?;
         f.write_char('\n')
+    }
+}
+
+impl ops::Deref for Ident {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
     }
 }
 
@@ -38,9 +53,22 @@ impl PrettyPrint for Program {
 }
 
 impl Analyze for Program {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
         self.0.analyze(summary)
     }
+}
+
+impl Generate for Program {
+    fn generate(&self, buf: &mut crate::generator::GenerateBuf) {
+        self.0.generate(buf)
+    }
+}
+
+#[derive(Debug, Error, Diagnostic)]
+#[error("Missing semicolon")]
+pub struct AnalyzeMissingSemicolon {
+    #[label("expected a semicolon")]
+    location: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +92,25 @@ impl PrettyPrint for Block {
 }
 
 impl Analyze for Block {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        if let Some(s) = self
+            .stmts
+            .iter()
+            .rev()
+            .skip(1)
+            .find(|s| s.has_semi().is_none_or(|t| !t))
+        {
+            summary.error(AnalyzeMissingSemicolon {
+                location: s.span().end_span(0),
+            });
+        }
+
         self.stmts.analyze(summary)
+    }
+}
+
+impl Generate for Block {
+    fn generate(&self, buf: &mut crate::generator::GenerateBuf) {
+        self.stmts.generate(buf)
     }
 }

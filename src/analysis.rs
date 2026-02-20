@@ -3,8 +3,10 @@ use std::ops::ControlFlow;
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::generator::{AnalyzeImmInvalid, AnalyzeInsNotExist, AnalyzeOffsetInvalid, AnalyzeRegInvalid};
-use crate::nodes::AnalyzeWhileConditionError;
+use crate::generator::{
+    AnalyzeImmInvalid, AnalyzeInsNotExist, AnalyzeOffsetInvalid, AnalyzeRegInvalid,
+};
+use crate::nodes::{AnalyzeMissingSemicolon, AnalyzeWhileConditionError};
 
 pub type AnalyzeResult = ControlFlow<(), ()>;
 
@@ -33,9 +35,9 @@ impl AnalyzeSummary {
 }
 
 pub trait Analyze {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult;
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult;
 
-    fn analyzed(&self) -> AnalyzeSummary {
+    fn analyzed(&mut self) -> AnalyzeSummary {
         let mut summary = AnalyzeSummary::default();
 
         _ = self.analyze(&mut summary);
@@ -54,6 +56,9 @@ pub enum AnalyzeError {
     ImmInvalid(#[from] AnalyzeImmInvalid),
     #[error(transparent)]
     #[diagnostic(transparent)]
+    MissingSemicolon(#[from] AnalyzeMissingSemicolon),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     OffsetInvalid(#[from] AnalyzeOffsetInvalid),
     #[error(transparent)]
     #[diagnostic(transparent)]
@@ -64,7 +69,7 @@ pub enum AnalyzeError {
 }
 
 impl<T: Analyze> Analyze for Vec<T> {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
         for v in self {
             v.analyze(summary)?;
         }

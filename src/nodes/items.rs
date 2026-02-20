@@ -1,42 +1,23 @@
 use std::fmt::{self, Write as _};
 
+use amrisk_macros::Node;
+
 use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
+use crate::generator::{Generate, GenerateBuf, Instruction, Offset, Register};
 use crate::nodes::{Block, Ident};
-use crate::parser::{IntoSpanned, PrettyFormatter, PrettyPrint, Span, Spanned, Token};
+use crate::parser::{IntoSpanned, Span, Spanned, Token};
+use crate::pretty::{PrettyFormatter, PrettyPrint};
 
 /// Declarations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
+#[node(analyzer, generator, pretty, spanned)]
 pub enum Item {
     Function(ItemFunction),
 }
 
-impl IntoSpanned for Item {
-    fn span(&self) -> Span {
-        match self {
-            Item::Function(item) => item.span(),
-        }
-    }
-}
-
-impl PrettyPrint for Item {
-    fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
-        match self {
-            Item::Function(item) => item.pretty_print(f),
-            // _ => todo!(),
-        }
-    }
-}
-
-impl Analyze for Item {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
-        match self {
-            Item::Function(item) => item.analyze(summary),
-        }
-    }
-}
-
 /// Declaration of a function
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
+#[node()]
 pub struct ItemFunction {
     pub fn_: Spanned<Token>,
     pub name: Spanned<Ident>,
@@ -65,8 +46,51 @@ impl PrettyPrint for ItemFunction {
 }
 
 impl Analyze for ItemFunction {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
         self.body.analyze(summary)
+    }
+}
+
+impl Generate for ItemFunction {
+    fn generate(&self, buf: &mut GenerateBuf) {
+        buf.label_here(&**self.name);
+
+        let child = self.body.generated();
+        let child_stack = child.stack_size() as i32;
+
+        let stack_size = child_stack + 4; // Plus return pointer
+
+        // Reserve required stack
+        buf.push(Instruction::Addi(
+            Register::Stack,
+            Register::Stack,
+            -stack_size,
+        ));
+
+        // Save return pointer
+        buf.push(Instruction::Sw(
+            Register::Return,
+            Offset::Imm(child_stack),
+            Register::Stack,
+        ));
+
+        buf.extend_on(child, format!(".{}.", self.name.value.0));
+
+        // Load return pointer
+        buf.push(Instruction::Lw(
+            Register::Return,
+            Offset::Imm(child_stack),
+            Register::Stack,
+        ));
+
+        // Free used stack
+        buf.push(Instruction::Addi(
+            Register::Stack,
+            Register::Stack,
+            stack_size,
+        ));
+
+        buf.push(Instruction::Ret());
     }
 }
 

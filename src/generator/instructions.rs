@@ -3,6 +3,7 @@ use super::*;
 use crate::analysis::AnalyzeSummary;
 use crate::nodes::Expr;
 use crate::parser::Spanned;
+use std::fmt;
 
 macro_rules! instructions {
     (
@@ -14,6 +15,14 @@ macro_rules! instructions {
         }
 
         instructions!{@convertion
+            $([$name] [$($ins)*] [$($args)*]);*
+        }
+
+        instructions!{@impl
+            $([$name] [$($ins)*] [$($args)*]);*
+        }
+
+        instructions!{@display
             $([$name] [$($ins)*] [$($args)*]);*
         }
     };
@@ -30,7 +39,7 @@ macro_rules! instructions {
         }
     };
 
-    ( @convertion
+    ( @impl
     $([$name:ident] [$ins:ident $($yunk:tt)?] [$($arg:ident),*]);*
     ) => {
         impl Instruction {
@@ -41,6 +50,36 @@ macro_rules! instructions {
                 }
             }
 
+            pub fn scope(self, rhs: &str) -> Self {
+                match self {
+                    $(instructions!(@args-indexed [$name] [$($arg),*]) =>
+                        instructions!(@args-offset [$name] [rhs] [$($arg),*]),
+                    )*
+                    _ => self
+                }
+            }
+        }
+    };
+
+    ( @display
+    $([$name:ident] [$ins:ident $($alias:tt)?] [$($arg:ident),*]);*
+    ) => {
+        impl fmt::Display for Instruction {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match self {
+                    $(instructions!(@args-indexed [$name] [$($arg),*]) =>
+                        f.write_fmt(instructions!(@args-format [$ins] [$($alias)?] [$($arg),*])),
+                    )*
+                    _ => Ok(())
+                }
+            }
+        }
+    };
+
+    ( @convertion
+    $([$name:ident] [$ins:ident $($yunk:tt)?] [$($arg:ident),*]);*
+    ) => {
+        impl Instruction {
             pub fn from_0(summary: &mut AnalyzeSummary, name: Spanned<&str>) -> Option<Self> {
                 match name.value {
                     $(stringify!($ins) if 0 == instructions!(@count [$($arg),*]) =>
@@ -98,7 +137,7 @@ macro_rules! instructions {
 
     ( @arg-ty [immediate] ) => {i32};
     ( @arg-ty [imm] ) => {i32};
-    ( @arg-ty [csr] ) => {()};
+    ( @arg-ty [csr] ) => {Register};
     ( @arg-ty [rs] ) => {Register};
     ( @arg-ty [rt] ) => {Register};
     ( @arg-ty [rd] ) => {Register};
@@ -107,7 +146,7 @@ macro_rules! instructions {
 
     ( @arg-from [$s:ident] [immediate] [$e:expr] ) => {Offset::imm_from_expr($e, $s)?};
     ( @arg-from [$s:ident] [imm] [$e:expr]) => {Offset::imm_from_expr($e, $s)?};
-    ( @arg-from [$s:ident] [csr] [$e:expr]) => {()};
+    ( @arg-from [$s:ident] [csr] [$e:expr]) => {Register::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [rs] [$e:expr]) => {Register::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [rt] [$e:expr]) => {Register::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [rd] [$e:expr]) => {Register::from_expr($e, $s)?};
@@ -116,12 +155,16 @@ macro_rules! instructions {
 
     ( @arg-mock [immediate] ) => {0};
     ( @arg-mock [imm] ) => {0};
-    ( @arg-mock [csr] ) => {()};
+    ( @arg-mock [csr] ) => {Register::Zero};
     ( @arg-mock [rs] ) => {Register::Zero};
     ( @arg-mock [rt] ) => {Register::Zero};
     ( @arg-mock [rd] ) => {Register::Zero};
     ( @arg-mock [symbol] ) => {Offset::Imm(0)};
     ( @arg-mock [offset] ) => {Offset::Imm(0)};
+
+    ( @arg-offset [$rhs:ident] [$arg:ident] [symbol] ) => {$arg + $rhs.to_owned()};
+    ( @arg-offset [$rhs:ident] [$arg:ident] [offset] ) => {$arg + $rhs.to_owned()};
+    ( @arg-offset [$rhs:ident] [$arg:ident] [$ty:ident] ) => {$arg};
 
     ( @args [$s:ident] [$t:expr] [1] [$arg0:ident] [$_:ident] ) => {$t(instructions!(@arg-from [$s] [$_] [$arg0]))};
     ( @args [$s:ident] [$t:expr] [1] [$arg0:ident] [$($tail:ident),*] ) => {
@@ -145,6 +188,36 @@ macro_rules! instructions {
     ( @args [$s:ident] [$t:expr] [3] [$arg0:ident, $arg1:ident, $arg2:ident] [$($tail:ident),*] ) => {
         $t($(instructions!(@arg-mock [$tail])),*)
     };
+
+    ( @args-indexed [$s:ident] [] ) => {Self::$s()};
+    ( @args-indexed [$s:ident] [$_:ident] ) => {Self::$s($_)};
+    ( @args-indexed [$s:ident] [$_:ident, $__:ident] ) => {Self::$s($_, $__)};
+    ( @args-indexed [$s:ident] [$_:ident, $__:ident, $___:ident] ) => {Self::$s($_, $__, $___)};
+
+    ( @args-offset [$s:ident] [$rhs:ident] [] ) => {Self::$s()};
+    ( @args-offset [$s:ident] [$rhs:ident] [$_:ident] ) => {
+        Self::$s(instructions!(@arg-offset [$rhs] [$_] [$_]))
+    };
+    ( @args-offset [$s:ident] [$rhs:ident] [$_:ident, $__:ident] ) => {
+        Self::$s(instructions!(@arg-offset [$rhs] [$_] [$_]), instructions!(@arg-offset [$rhs] [$__] [$__]))
+    };
+    ( @args-offset [$s:ident] [$rhs:ident] [$_:ident, $__:ident, $___:ident] ) => {
+        Self::$s(instructions!(@arg-offset [$rhs] [$_] [$_]), instructions!(@arg-offset [$rhs] [$__] [$__]), instructions!(@arg-offset [$rhs] [$___] [$___]))
+    };
+
+    ( @args-format [$s:ident] [$($alias:tt)?] [] ) => {format_args!("{}", instructions!(@aliasing [$s] [$($alias)?]))};
+    ( @args-format [$s:ident] [$($alias:tt)?] [$_:ident] ) => {
+        format_args!("{} {}", instructions!(@aliasing [$s] [$($alias)?]), $_)
+    };
+    ( @args-format [$s:ident] [$($alias:tt)?] [$_:ident, $__:ident] ) => {
+        format_args!("{} {}, {}", instructions!(@aliasing [$s] [$($alias)?]), $_, $__)
+    };
+    ( @args-format [$s:ident] [$($alias:tt)?] [$_:ident, $__:ident, $___:ident] ) => {
+        format_args!("{} {}, {}, {}", instructions!(@aliasing [$s] [$($alias)?]), $_, $__, $___)
+    };
+
+    ( @aliasing [$s:ident] [($($alias:tt)+)] ) => {stringify!($($alias)+)};
+    ( @aliasing [$s:ident] [] ) => {stringify!($s)};
 }
 
 instructions! {
@@ -158,9 +231,9 @@ instructions! {
 [Bge] [bge] [rd, rs, offset] [] [""];
 [Bltu] [bltu] [rd, rs, offset] [] [""];
 [Bgeu] [bgeu] [rd, rs, offset] [] [""];
-// [Lb] [lb] [] [] [""];
-// [Lh] [lh] [] [] [""];
-// [Lw] [lw] [] [] [""];
+[Lb] [lb] [rd, symbol, rs] [] ["Load global"];
+[Lh] [lh] [rd, symbol, rs] [] ["Load global"];
+[Lw] [lw] [rd, symbol, rs] [] ["Load global"];
 [Lbu] [lbu] [rd, rs, offset] [] [""];
 [Lhu] [lhu] [rd, rs, offset] [] [""];
 // [Sb] [sb] [] [] [""];
@@ -236,9 +309,9 @@ instructions! {
 
 [La] [la] [rd, symbol] [[auipc rd, GOT[symbol][31:12]] [lw rd, rd, GOT[symbol][11:0]]] [""];
 
-[Lb] [lb] [rd, symbol] [[auipc rd, symbol[31:12]] [lb rd, symbol[11:0](rd)]] ["Load global"];
-[Lh] [lh] [rd, symbol] [[auipc rd, symbol[31:12]] [lh rd, symbol[11:0](rd)]] ["Load global"];
-[Lw] [lw] [rd, symbol] [[auipc rd, symbol[31:12]] [lw rd, symbol[11:0](rd)]] ["Load global"];
+// [Lb] [lb] [rd, symbol] [[auipc rd, symbol[31:12]] [lb rd, symbol[11:0](rd)]] ["Load global"];
+// [Lh] [lh] [rd, symbol] [[auipc rd, symbol[31:12]] [lh rd, symbol[11:0](rd)]] ["Load global"];
+// [Lw] [lw] [rd, symbol] [[auipc rd, symbol[31:12]] [lw rd, symbol[11:0](rd)]] ["Load global"];
 [Ld] [ld] [rd, symbol] [[auipc rd, symbol[31:12]] [ld rd, symbol[11:0](rd)]] ["Load global"];
 [Sb] [sb] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sb rd, symbol[11:0](rt)]] ["Store global"];
 [Sh] [sh] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sh rd, symbol[11:0](rt)]] ["Store global"];

@@ -1,3 +1,6 @@
+[workspace]
+members = ["macros"]
+
 [package]
 name = "amrisk"
 version = "0.1.0"
@@ -8,6 +11,8 @@ default = []
 peg-trace = ["peg/trace"]
 
 [dependencies]
+amrisk-macros.path = "./macros"
+
 miette = { version = "7.6.0", features = ["fancy"] }
 peg = "0.8.5"
 thiserror = "2.0.16"

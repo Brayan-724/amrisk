@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use peg::RuleResult;
 
 use super::*;
@@ -104,19 +106,19 @@ peg::parser!(
         ////////////////////
 
         rule expr() -> Expr = precedence!{
-            name:ident() _? "=" _? y:@ { Expr::Assign(name, Box::from(y)) }
+            name:ident() _? "=" _? y:@ { Expr::Assign(name, Box::from(RefCell::new(y))) }
             --
-            x:(@) _? "==" _? y:@ { Expr::Binary { kind: ExprBinary::Eq, lhs: x.into(), rhs: y.into() } }
-            x:(@) _? "!=" _? y:@ { Expr::Binary { kind: ExprBinary::Ne, lhs: x.into(), rhs: y.into() } }
-            x:(@) _? "<=" _? y:@ { Expr::Binary { kind: ExprBinary::Le, lhs: x.into(), rhs: y.into() } }
-            x:(@) _? ">=" _? y:@ { Expr::Binary { kind: ExprBinary::Ge, lhs: x.into(), rhs: y.into() } }
-            x:(@) _? ">" _? y:@ { Expr::Binary { kind: ExprBinary::Lt, lhs: x.into(), rhs: y.into() } }
-            x:(@) _? "<" _? y:@ { Expr::Binary { kind: ExprBinary::Gt, lhs: x.into(), rhs: y.into() } }
+            x:(@) _? "==" _? y:@ { Expr::Binary { kind: ExprBinary::Eq, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
+            x:(@) _? "!=" _? y:@ { Expr::Binary { kind: ExprBinary::Ne, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
+            x:(@) _? "<=" _? y:@ { Expr::Binary { kind: ExprBinary::Le, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
+            x:(@) _? ">=" _? y:@ { Expr::Binary { kind: ExprBinary::Ge, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
+            x:(@) _? ">" _? y:@ { Expr::Binary { kind: ExprBinary::Lt, lhs: RefCell::new(x).into(), rhs:  RefCell::new(y).into() } }
+            x:(@) _? "<" _? y:@ { Expr::Binary { kind: ExprBinary::Gt, lhs: RefCell::new(x).into(), rhs:  RefCell::new(y).into() } }
             --
-            c:expr_stom() _? "(" args:expr() ** (_? "," _?) ")" { Expr::Call(c.into(), args) }
+            c:expr_stom() _? "(" args:expr() ** (_? "," _?) ")" { Expr::Call(RefCell::new(c).into(), args) }
             --
-            x:(@) _? "+" _? y:@ { Expr::Binary { kind: ExprBinary::Add, lhs: x.into(), rhs: y.into() } }
-            x:(@) _? "-" _? y:@ { Expr::Binary { kind: ExprBinary::Sub, lhs: x.into(), rhs: y.into() } }
+            x:(@) _? "+" _? y:@ { Expr::Binary { kind: ExprBinary::Add, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
+            x:(@) _? "-" _? y:@ { Expr::Binary { kind: ExprBinary::Sub, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
             --
             e:expr_stom() { e }
         }
@@ -226,6 +228,6 @@ mod token {
             len: ident.len(),
         };
 
-        RuleResult::Matched(span.end(), Ok(span.of(Ident(ident))))
+        RuleResult::Matched(span.end(), Ok(span.of(Ident(ident.into()))))
     }
 }

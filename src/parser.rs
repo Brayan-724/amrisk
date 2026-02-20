@@ -1,8 +1,8 @@
 mod grammar;
-mod pretty;
+
+use std::ops;
 
 use miette::SourceSpan;
-pub use pretty::*;
 
 use peg::str::LineCol;
 
@@ -79,6 +79,12 @@ impl Span {
         self.start + self.len
     }
 
+    /// Create a padding from the end and set area as span.
+    /// If size is larger than span it will overflows to right.
+    pub fn end_span(&self, size: usize) -> Span {
+        Span::new(self.start + self.len.saturating_sub(size), size)
+    }
+
     pub fn location(&self, source: &str) -> LineCol {
         <str as peg::Parse>::position_repr(source, self.start)
     }
@@ -94,6 +100,14 @@ impl From<Span> for SourceSpan {
 pub struct Spanned<T> {
     pub span: Span,
     pub value: T,
+}
+
+impl<T> ops::Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
 }
 
 pub trait IntoSpanned: Sized {

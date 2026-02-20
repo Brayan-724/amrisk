@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::{fmt, ops};
 
 use miette::Diagnostic;
 use thiserror::Error;
@@ -27,6 +28,17 @@ pub struct AnalyzeOffsetInvalid {
     location: Span,
 }
 
+impl ops::Add<String> for Offset {
+    type Output = Self;
+
+    fn add(self, rhs: String) -> Self::Output {
+        match self {
+            Self::Label(l) => Self::Label(Rc::from(rhs + &l)),
+            Self::Imm(i) => Self::Imm(i),
+        }
+    }
+}
+
 impl Offset {
     pub fn imm_from_expr(value: &Expr, summary: &mut AnalyzeSummary) -> Option<i32> {
         match value {
@@ -43,7 +55,7 @@ impl Offset {
     pub fn from_expr(value: &Expr, summary: &mut AnalyzeSummary) -> Option<Self> {
         match value {
             Expr::Number(n) => Some(Offset::Imm(n.value)),
-            Expr::Label(l) => Some(Offset::Label(Rc::from(l.value.0.clone()))),
+            Expr::Label(l) => Some(Offset::Label(l.value.0.clone())),
             _ => {
                 summary.error(AnalyzeOffsetInvalid {
                     location: value.span(),
@@ -54,10 +66,34 @@ impl Offset {
     }
 }
 
+impl fmt::Debug for Offset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+
+        }
+    }
+}
+
+impl fmt::Display for Offset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Offset::Label(l) => f.write_str(&*l),
+            Offset::Imm(i) => f.write_fmt(format_args!("{i}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Register {
+    /// x0 | zero
     Zero,
-    Custom(String),
+    /// x1 | ra
+    Return,
+    /// x2 | sp
+    Stack,
+    /// x8 | s0 | fp
+    Result,
+    Custom(Rc<str>),
 }
 
 // #[derive(Debug, Error, Diagnostic)]
@@ -77,8 +113,11 @@ pub struct AnalyzeRegInvalid {
 impl Register {
     pub fn from_expr(value: &Expr, summary: &mut AnalyzeSummary) -> Option<Self> {
         match value {
-            Expr::Ident(i) => match i.value.0.as_str() {
+            Expr::Ident(i) => match &*i.value {
                 "x0" | "zero" => Some(Self::Zero),
+                "x1" | "ra" => Some(Self::Return),
+                "x2" | "sp" => Some(Self::Stack),
+                "x8" | "s0" | "fp" => Some(Self::Result),
                 _ => Some(Self::Custom(i.value.0.clone())),
             },
             _ => {
@@ -87,6 +126,18 @@ impl Register {
                 });
                 None
             }
+        }
+    }
+}
+
+impl fmt::Display for Register {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Register::Zero => f.write_str("x0"),
+            Register::Return => f.write_str("ra"),
+            Register::Stack => f.write_str("sp"),
+            Register::Result => f.write_str("s0"),
+            Register::Custom(c) => f.write_str(&c),
         }
     }
 }

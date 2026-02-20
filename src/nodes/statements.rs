@@ -1,13 +1,17 @@
 use std::fmt;
 
+use amrisk_macros::Node;
 use miette::Diagnostic;
 use thiserror::Error;
 
 use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
+use crate::generator::{Generate, GenerateBuf, Instruction, Offset, Register};
 use crate::nodes::{Block, Expr, ExprBinary, Ident};
-use crate::parser::{IntoSpanned, PrettyFormatter, PrettyPrint, Span, Spanned, Token};
+use crate::parser::{IntoSpanned, Span, Spanned, Token};
+use crate::pretty::{PrettyFormatter, PrettyPrint};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
+#[node(analyzer, generator, pretty, spanned)]
 pub enum Statement {
     Expr(StmtExpr),
     Label(StmtLabel),
@@ -16,38 +20,12 @@ pub enum Statement {
     While(StmtWhile),
 }
 
-impl IntoSpanned for Statement {
-    fn span(&self) -> Span {
+impl Statement {
+    pub fn has_semi(&self) -> Option<bool> {
         match self {
-            Statement::Expr(s) => s.span(),
-            Statement::Label(item) => item.span(),
-            Statement::Let(s) => s.span(),
-            Statement::Loop(item) => item.span(),
-            Statement::While(item) => item.span(),
-        }
-    }
-}
-
-impl PrettyPrint for Statement {
-    fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
-        match self {
-            Statement::Expr(s) => s.pretty_print(f),
-            Statement::Label(s) => s.pretty_print(f),
-            Statement::Let(s) => s.pretty_print(f),
-            Statement::Loop(s) => s.pretty_print(f),
-            Statement::While(s) => s.pretty_print(f),
-        }
-    }
-}
-
-impl Analyze for Statement {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
-        match self {
-            Statement::Expr(s) => s.analyze(summary),
-            Statement::Label(s) => s.analyze(summary),
-            Statement::Let(s) => s.analyze(summary),
-            Statement::Loop(s) => s.analyze(summary),
-            Statement::While(s) => s.analyze(summary),
+            Statement::Expr(stmt_expr) => Some(stmt_expr.semi.is_some()),
+            Statement::Let(stmt_let) => Some(stmt_let.semi.is_some()),
+            _ => None,
         }
     }
 }
@@ -84,8 +62,14 @@ impl PrettyPrint for StmtExpr {
 }
 
 impl Analyze for StmtExpr {
-    fn analyze(&self, _: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, _: &mut AnalyzeSummary) -> AnalyzeResult {
         AnalyzeResult::Continue(())
+    }
+}
+
+impl Generate for StmtExpr {
+    fn generate(&self, buf: &mut GenerateBuf) {
+        self.expr.generate(buf);
     }
 }
 
@@ -116,8 +100,14 @@ impl PrettyPrint for StmtLabel {
 }
 
 impl Analyze for StmtLabel {
-    fn analyze(&self, _: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, _: &mut AnalyzeSummary) -> AnalyzeResult {
         AnalyzeResult::Continue(())
+    }
+}
+
+impl Generate for StmtLabel {
+    fn generate(&self, buf: &mut GenerateBuf) {
+        buf.label_here(&**self.name);
     }
 }
 
@@ -156,8 +146,20 @@ impl PrettyPrint for StmtLet {
 }
 
 impl Analyze for StmtLet {
-    fn analyze(&self, _: &mut AnalyzeSummary) -> AnalyzeResult {
-        AnalyzeResult::Continue(())
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        self.expr.analyze(summary)
+    }
+}
+
+impl Generate for StmtLet {
+    fn generate(&self, buf: &mut GenerateBuf) {
+        let offset = buf.push_stack(&**self.name, 4);
+        self.expr.generate(buf);
+        buf.push(Instruction::Sw(
+            Register::Result,
+            Offset::Imm(offset as i32),
+            Register::Stack,
+        ));
     }
 }
 
@@ -186,9 +188,13 @@ impl PrettyPrint for StmtLoop {
 }
 
 impl Analyze for StmtLoop {
-    fn analyze(&self, _: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, _: &mut AnalyzeSummary) -> AnalyzeResult {
         AnalyzeResult::Continue(())
     }
+}
+
+impl Generate for StmtLoop {
+    fn generate(&self, buf: &mut GenerateBuf) {}
 }
 
 ////////////////////
@@ -227,7 +233,9 @@ pub struct AnalyzeWhileConditionError {
 }
 
 impl Analyze for StmtWhile {
-    fn analyze(&self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        self.cond.analyze(summary)?;
+
         match self.cond {
             Expr::Binary {
                 kind:
@@ -239,14 +247,15 @@ impl Analyze for StmtWhile {
                     | ExprBinary::Le,
                 ..
             } => {}
-            Expr::Binary {
-                ref lhs, ref rhs, ..
-            } => summary.error(AnalyzeWhileConditionError {
-                location: lhs.span().merge(rhs.span()),
+            _ => summary.error(AnalyzeWhileConditionError {
+                location: self.cond.span(),
             }),
-            _ => {}
         }
 
         AnalyzeResult::Continue(())
     }
+}
+
+impl Generate for StmtWhile {
+    fn generate(&self, buf: &mut GenerateBuf) {}
 }

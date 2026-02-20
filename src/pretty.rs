@@ -3,7 +3,7 @@ use std::{fmt, ops};
 
 use peg::str::LineCol;
 
-use super::*;
+use crate::parser::*;
 
 pub struct PrettyPrinted<'a, 's, T: PrettyPrint>(&'a T, &'s str);
 
@@ -128,6 +128,13 @@ impl<'s, 'a, 'f: 'a> PrettyFormatter<'s, 'a, 'f> {
     #[inline(always)]
     pub fn write_children<T: PrettyPrint>(&mut self, children: &[T]) -> fmt::Result {
         self.level += 1;
+
+        if children.is_empty() {
+            self.write_indent()?;
+            self.write_str("\x1b[2;31mEmpty\x1b[0m\n")?;
+            self.level -= 1;
+            return Ok(());
+        }
 
         let last = children.len() - 1;
         for (idx, child) in children.into_iter().enumerate() {
