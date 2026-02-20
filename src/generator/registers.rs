@@ -125,7 +125,7 @@ impl fmt::Display for Offset {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Register {
     /// x0 | zero
     Zero,
@@ -255,7 +255,7 @@ impl fmt::Display for Register {
             match self {
                 Self::Zero => f.write_str("\x1b[1;38;5;220mx0"),
                 Self::Return => f.write_str("\x1b[1;38;5;111mra"),
-                Self::Stack => f.write_str ("\x1b[1;38;5;112msp"),
+                Self::Stack => f.write_str("\x1b[1;38;5;112msp"),
                 Self::Global => f.write_str("\x1b[1;38;5;81mgp"),
                 Self::Thread => f.write_str("\x1b[1;38;5;43mtp"),
                 Self::TemporalReturn => f.write_str("\x1b[1;38;5;217mt0"),

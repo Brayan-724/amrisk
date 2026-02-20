@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 
 use amrisk_macros::Node;
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
+use crate::analysis::{Analyze, AnalyzeResult, AnalyzeStore, AnalyzeSummary};
 use crate::generator::{Generate, GenerateBuf, Instruction, Offset, Register};
 use crate::nodes::{Block, Expr, ExprBinary, Ident};
 use crate::parser::{IntoSpanned, Span, Spanned, Token};
@@ -123,6 +125,11 @@ pub struct StmtLet {
     pub semi: Option<Spanned<Token>>,
 }
 
+#[derive(Default)]
+pub struct StmtLetStore {
+    pub local_vars: HashMap<Rc<str>, Span>,
+}
+
 impl IntoSpanned for StmtLet {
     fn span(&self) -> Span {
         self.let_.span.merge(
@@ -145,8 +152,18 @@ impl PrettyPrint for StmtLet {
     }
 }
 
+impl AnalyzeStore for StmtLet {
+    type Store = StmtLetStore;
+}
+
 impl Analyze for StmtLet {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        let store = Self::store(summary);
+
+        store
+            .local_vars
+            .insert(self.name.0.clone(), self.name.span());
+
         self.expr.analyze(summary)
     }
 }

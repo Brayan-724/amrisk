@@ -19,6 +19,7 @@ pub enum Item {
 #[derive(Debug, Clone, Node)]
 #[node()]
 pub struct ItemFunction {
+    pub unsafe_: Option<Spanned<Token>>,
     pub fn_: Spanned<Token>,
     pub name: Spanned<Ident>,
     pub args: FnArgs,
@@ -28,7 +29,10 @@ pub struct ItemFunction {
 
 impl IntoSpanned for ItemFunction {
     fn span(&self) -> Span {
-        self.fn_.span.merge(self.body.span())
+        self.unsafe_
+            .unwrap_or(self.fn_)
+            .span
+            .merge(self.body.span())
     }
 }
 
@@ -39,6 +43,7 @@ impl PrettyPrint for ItemFunction {
             .field("name", &self.name)?
             .field("args", &self.args)?
             .field("ret", &self.ret)?
+            .field("unsafe", &self.unsafe_.is_some())?
             .end_fields()
             .children(&self.body.stmts)?
             .finish()

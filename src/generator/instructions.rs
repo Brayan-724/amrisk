@@ -259,9 +259,9 @@ instructions! {
 [Bge] [bge] [rd, rs, offset] [] [""];
 [Bltu] [bltu] [rd, rs, offset] [] [""];
 [Bgeu] [bgeu] [rd, rs, offset] [] [""];
-[Lb] [lb] [rd, symbol, rs] [] ["Load global"];
-[Lh] [lh] [rd, symbol, rs] [] ["Load global"];
-[Lw] [lw] [rd, symbol, rs] [] ["Load global"];
+[Lb] [lb] [rd, symbol, rs] [] ["Load global byte"];
+[Lh] [lh] [rd, symbol, rs] [] ["Load global half"];
+[Lw] [lw] [rd, symbol, rs] [] ["Load global word"];
 [Lbu] [lbu] [rd, rs, offset] [] [""];
 [Lhu] [lhu] [rd, rs, offset] [] [""];
 // [Sb] [sb] [] [] [""];
@@ -340,15 +340,15 @@ instructions! {
 // [Lb] [lb] [rd, symbol] [[auipc rd, symbol[31:12]] [lb rd, symbol[11:0](rd)]] ["Load global"];
 // [Lh] [lh] [rd, symbol] [[auipc rd, symbol[31:12]] [lh rd, symbol[11:0](rd)]] ["Load global"];
 // [Lw] [lw] [rd, symbol] [[auipc rd, symbol[31:12]] [lw rd, symbol[11:0](rd)]] ["Load global"];
-[Ld] [ld] [rd, symbol] [[auipc rd, symbol[31:12]] [ld rd, symbol[11:0](rd)]] ["Load global"];
-[Sb] [sb] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sb rd, symbol[11:0](rt)]] ["Store global"];
-[Sh] [sh] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sh rd, symbol[11:0](rt)]] ["Store global"];
-[Sw] [sw] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sw rd, symbol[11:0](rt)]] ["Store global"];
-[Sd] [sd] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sd rd, symbol[11:0](rt)]] ["Store global"];
-[Flw] [flw] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [flw rd, symbol[11:0](rt)]] ["Load global de punto flotante"];
-[Fld] [fld] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fld rd, symbol[11:0](rt)]] ["Load global de punto flotante"];
-[Fsw] [fsw] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fsw rd, symbol[11:0](rt)]] ["Store global de punto flotante"];
-[Fsd] [fsd] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fsd rd, symbol[11:0](rt)]] ["Store global de punto flotante"];
+[Ld] [ld] [rd, symbol] [[auipc rd, symbol[31:12]] [ld rd, symbol[11:0](rd)]] ["Load global double"];
+[Sb] [sb] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sb rd, symbol[11:0](rt)]] ["Store global byte"];
+[Sh] [sh] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sh rd, symbol[11:0](rt)]] ["Store global half"];
+[Sw] [sw] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sw rd, symbol[11:0](rt)]] ["Store global word"];
+[Sd] [sd] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [sd rd, symbol[11:0](rt)]] ["Store global double"];
+[Flw] [flw] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [flw rd, symbol[11:0](rt)]] ["Load global de float word"];
+[Fld] [fld] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fld rd, symbol[11:0](rt)]] ["Load global de float double"];
+[Fsw] [fsw] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fsw rd, symbol[11:0](rt)]] ["Store global de float word"];
+[Fsd] [fsd] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fsd rd, symbol[11:0](rt)]] ["Store global de float double"];
 
 [Li] [li] [rd, immediate] [Muchas secuencias] ["Load immediate"];
 [Mv] [mv] [rd, rs] [addi rd, rs, 0] ["Copiar registro"];

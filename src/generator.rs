@@ -3,6 +3,7 @@ mod linked_vector;
 mod registers;
 
 use std::fmt::{self, Write};
+use std::ops::ControlFlow;
 
 use miette::Diagnostic;
 use thiserror::Error;
@@ -25,21 +26,32 @@ pub struct GenerateCtx {
     vars: Vec<(Ident, usize)>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct GenerateBuf {
     buf: Vec<Instruction>,
     ctx: GenerateCtx,
     labels: Vec<(Box<str>, usize)>,
     stack: Vec<(Box<str>, usize)>,
+    pub result: Register,
+}
+
+impl Default for GenerateBuf {
+    fn default() -> Self {
+        Self {
+            buf: Vec::new(),
+            ctx: GenerateCtx::default(),
+            labels: Vec::new(),
+            stack: Vec::new(),
+            result: Register::Result,
+        }
+    }
 }
 
 impl GenerateBuf {
     pub fn new(ctx: GenerateCtx) -> Self {
         Self {
-            buf: Vec::new(),
             ctx,
-            labels: Vec::new(),
-            stack: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -88,10 +100,47 @@ impl GenerateBuf {
         }
     }
 
-    pub fn get_stack(&self, name: &str) -> Option<usize> {
+    pub fn get_stack(&self, name: &str) -> Option<(usize, usize)> {
         self.stack
             .iter()
-            .find_map(|(var, offset)| (&**var == name).then_some(*offset))
+            .try_fold(0, |offset, (var, size)| {
+                if &**var == name {
+                    ControlFlow::Break((offset, *size))
+                } else {
+                    ControlFlow::Continue(offset + size)
+                }
+            })
+            .break_value()
+    }
+
+    pub fn next_result_peek(&self) -> Register {
+        match self.result {
+            Register::Result => Register::Local(0),
+            Register::Local(n @ 0..=5) => Register::Local(n + 1),
+            Register::Local(6..) => todo!(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn next_result(&mut self) -> Register {
+        let next = self.next_result_peek();
+
+        self.result = next;
+
+        next
+    }
+
+    pub fn prev_result(&mut self) -> Register {
+        let prev = self.result;
+        let next = match self.result {
+            Register::Result | Register::Local(0) => Register::Result,
+            Register::Local(n @ 1..) => Register::Local(n - 1),
+            _ => unreachable!(),
+        };
+
+        self.result = next;
+
+        prev
     }
 }
 

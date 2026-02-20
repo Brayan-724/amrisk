@@ -41,7 +41,7 @@ peg::parser!(
             args:fn_args() _?
             ret:fn_ret()? _?
             body:block() _?
-        { Item::Function(ItemFunction { fn_, name, args, ret, body }) }
+        { Item::Function(ItemFunction { unsafe_, fn_, name, args, ret, body }) }
         / expected!("Function")
 
         ////////////////////
@@ -108,17 +108,17 @@ peg::parser!(
         rule expr() -> Expr = precedence!{
             name:ident() _? "=" _? y:@ { Expr::Assign(name, Box::from(RefCell::new(y))) }
             --
-            x:(@) _? "==" _? y:@ { Expr::Binary { kind: ExprBinary::Eq, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
-            x:(@) _? "!=" _? y:@ { Expr::Binary { kind: ExprBinary::Ne, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
-            x:(@) _? "<=" _? y:@ { Expr::Binary { kind: ExprBinary::Le, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
-            x:(@) _? ">=" _? y:@ { Expr::Binary { kind: ExprBinary::Ge, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
-            x:(@) _? ">" _? y:@ { Expr::Binary { kind: ExprBinary::Lt, lhs: RefCell::new(x).into(), rhs:  RefCell::new(y).into() } }
-            x:(@) _? "<" _? y:@ { Expr::Binary { kind: ExprBinary::Gt, lhs: RefCell::new(x).into(), rhs:  RefCell::new(y).into() } }
+            x:(@) _? "==" _? y:@ { Expr::Binary { kind: ExprBinary::Eq, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
+            x:(@) _? "!=" _? y:@ { Expr::Binary { kind: ExprBinary::Ne, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
+            x:(@) _? "<=" _? y:@ { Expr::Binary { kind: ExprBinary::Le, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
+            x:(@) _? ">=" _? y:@ { Expr::Binary { kind: ExprBinary::Ge, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
+            x:(@) _? ">"  _? y:@ { Expr::Binary { kind: ExprBinary::Lt, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
+            x:(@) _? "<"  _? y:@ { Expr::Binary { kind: ExprBinary::Gt, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
             --
             c:expr_stom() _? "(" args:expr() ** (_? "," _?) ")" { Expr::Call(RefCell::new(c).into(), args) }
             --
-            x:(@) _? "+" _? y:@ { Expr::Binary { kind: ExprBinary::Add, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
-            x:(@) _? "-" _? y:@ { Expr::Binary { kind: ExprBinary::Sub, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into() } }
+            x:(@) _? "+"  _? y:@ { Expr::Binary { kind: ExprBinary::Add, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
+            x:(@) _? "-"  _? y:@ { Expr::Binary { kind: ExprBinary::Sub, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
             --
             e:expr_stom() { e }
         }

@@ -26,9 +26,19 @@
 //   ret();
 // }
 
+
+fn add() {
+  let a = 1;
+  let b = 2;
+  let c = a - (a + b);
+}
+
 fn main() {
-  let c = 1;
-  c = 2;
+  let a = 1;
+  let b = 2;
+  let c = a - (a + b);
+
+  add();
 
   // print_int(a)
   // let a = 1;

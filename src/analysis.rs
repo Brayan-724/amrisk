@@ -1,3 +1,5 @@
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
 use std::ops::ControlFlow;
 
 use miette::Diagnostic;
@@ -10,6 +12,7 @@ pub type AnalyzeResult = ControlFlow<(), ()>;
 #[derive(Default)]
 pub struct AnalyzeSummary {
     errors: Vec<AnalyzeError>,
+    stores: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl AnalyzeSummary {
@@ -28,6 +31,24 @@ impl AnalyzeSummary {
                 miette::Report::new(error).with_source_code(source.clone())
             );
         }
+    }
+
+    pub fn store<T: AnalyzeStore>(&mut self) -> &mut T::Store {
+        let type_id = TypeId::of::<T>();
+
+        self.stores
+            .entry(type_id)
+            .or_insert_with(|| Box::from(T::Store::default()))
+            .downcast_mut()
+            .expect("`TypeId` ensures `Any` type safety")
+    }
+}
+
+pub trait AnalyzeStore: 'static + Sized {
+    type Store: Default;
+
+    fn store(summary: &mut AnalyzeSummary) -> &mut Self::Store {
+        summary.store::<Self>()
     }
 }
 
@@ -63,6 +84,9 @@ pub enum AnalyzeError {
     #[error(transparent)]
     #[diagnostic(transparent)]
     RegNotFound(#[from] generator::AnalyzeRegNotFound),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    VariableNotExistsError(#[from] nodes::AnalyzeVariableNotExistsError),
     #[error(transparent)]
     #[diagnostic(transparent)]
     WhileConditionError(#[from] nodes::AnalyzeWhileConditionError),

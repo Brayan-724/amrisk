@@ -1,13 +1,18 @@
 use std::cell::RefCell;
-use std::fmt;
+use std::io::BufRead;
+use std::{fmt, mem};
 
 use amrisk_macros::Node;
+use miette::Diagnostic;
+use thiserror::Error;
 
-use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
+use crate::analysis::{Analyze, AnalyzeResult, AnalyzeStore, AnalyzeSummary};
 use crate::generator::{Generate, GenerateBuf, Imm, Instruction, Offset, Register};
 use crate::nodes::{Block, Ident};
 use crate::parser::{IntoSpanned, Span, Spanned};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
+
+use super::StmtLet;
 
 #[derive(Debug, Clone, Node)]
 #[node()]
@@ -20,10 +25,23 @@ pub enum Expr {
         kind: ExprBinary,
         lhs: Box<RefCell<Expr>>,
         rhs: Box<RefCell<Expr>>,
+        swap_load: bool,
     },
     Call(Box<RefCell<Expr>>, Vec<Expr>),
     Label(Spanned<Ident>),
     Number(Spanned<i32>),
+}
+
+#[derive(Default)]
+pub struct ExprAnalyzeStore {
+    binary_cost: usize,
+}
+
+#[derive(Debug, Error, Diagnostic)]
+#[error("Variable does not exist")]
+pub struct AnalyzeVariableNotExistsError {
+    #[label]
+    location: Span,
 }
 
 impl IntoSpanned for Expr {
@@ -75,7 +93,7 @@ impl PrettyPrint for Expr {
                 .node("Expr::Block", v.span())?
                 .children(&v.stmts)?
                 .finish(),
-            Expr::Binary { kind, lhs, rhs } => f
+            Expr::Binary { kind, lhs, rhs, .. } => f
                 .node("Expr::Binary", lhs.span())?
                 .begin_fields()
                 .field(
@@ -116,35 +134,79 @@ impl PrettyPrint for RefCell<Expr> {
     }
 }
 
+impl AnalyzeStore for Expr {
+    type Store = ExprAnalyzeStore;
+}
+
 impl Analyze for Expr {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
         match self {
-            Expr::Assign(_, expr) => {
+            Expr::Assign(var, expr) => {
+                if !summary.store::<StmtLet>().local_vars.contains_key(&var.0) {
+                    summary.error(AnalyzeVariableNotExistsError {
+                        location: var.span(),
+                    });
+                }
+
                 expr.analyze(summary)?;
             }
             Expr::Block(block) => {
                 block.analyze(summary)?;
             }
-            Expr::Binary { kind, lhs, rhs } => {
+            Expr::Binary {
+                kind,
+                lhs,
+                rhs,
+                swap_load,
+            } => {
+                let base_cost = Self::store(summary).binary_cost;
+
                 lhs.analyze(summary)?;
+                let lhs_cost = Self::store(summary).binary_cost;
+                Self::store(summary).binary_cost = base_cost;
+
                 rhs.analyze(summary)?;
+                let rhs_cost = Self::store(summary).binary_cost;
+                Self::store(summary).binary_cost = base_cost;
 
-                let (a, b) = match (&*lhs.borrow(), &*rhs.borrow()) {
-                    (Expr::Number(a), Expr::Number(b)) => (a.clone(), b.clone()),
-                    _ => return AnalyzeResult::Continue(()),
+                let next_expr = match (&*lhs.borrow(), &*rhs.borrow()) {
+                    (Expr::Number(a), Expr::Number(b)) => {
+                        let (a, b) = (a.clone(), b.clone());
+                        let span = a.span.merge(b.span);
+
+                        let result = match kind {
+                            ExprBinary::Add => a.value + b.value,
+                            ExprBinary::Sub => a.value - b.value,
+                            _ => return AnalyzeResult::Continue(()),
+                        };
+
+                        Some(Expr::Number(span.of(result)))
+                    }
+                    _ => {
+                        Self::store(summary).binary_cost += 1;
+
+                        if rhs_cost > lhs_cost {
+                            *swap_load = true;
+                        }
+
+                        None
+                    }
                 };
 
-                let result = match kind {
-                    ExprBinary::Add => a.value + b.value,
-                    ExprBinary::Sub => a.value - b.value,
-                    _ => return AnalyzeResult::Continue(()),
-                };
-
-                *self = Expr::Number(a.span.merge(b.span).of(result));
+                if let Some(next_expr) = next_expr {
+                    *self = next_expr;
+                }
             }
             Expr::Call(expr, exprs) => {
                 expr.analyze(summary)?;
                 exprs.analyze(summary)?;
+            }
+            Expr::Ident(var) => {
+                if !summary.store::<StmtLet>().local_vars.contains_key(&var.0) {
+                    summary.error(AnalyzeVariableNotExistsError {
+                        location: var.span(),
+                    });
+                }
             }
             _ => {}
         }
@@ -163,44 +225,100 @@ impl Generate for Expr {
     fn generate(&self, buf: &mut GenerateBuf) {
         match self {
             Expr::Assign(var, expr) => {
-                if let Some(offset) = buf.get_stack(var.0.as_ref()) {
-                    expr.borrow().generate(buf);
+                let (offset, _) = buf
+                    .get_stack(var.0.as_ref())
+                    .expect("Analyzer must ensure variable exists");
 
-                    buf.push(Instruction::Sw(
-                        Register::Result,
-                        Offset::Imm(-(offset as i32)),
-                        Register::Stack,
-                    ));
-                }
+                expr.borrow().generate(buf);
+
+                buf.push(Instruction::Sw(
+                    buf.result,
+                    Offset::Imm(offset as i32),
+                    Register::Stack,
+                ));
             }
-            Expr::Ident(spanned) => todo!(),
+            Expr::Ident(var) => {
+                let (offset, size) = buf
+                    .get_stack(var.0.as_ref())
+                    .expect("Analyzer must ensure variable exists");
+
+                let offset = Offset::Imm(offset as i32);
+                let inst = match size {
+                    1 => Instruction::Lb(buf.result, offset, Register::Stack),
+                    2 => Instruction::Lh(buf.result, offset, Register::Stack),
+                    4 => Instruction::Lw(buf.result, offset, Register::Stack),
+                    _ => todo!(),
+                };
+
+                buf.push(inst);
+            }
             Expr::Block(block) => todo!(),
-            Expr::Binary { kind, lhs, rhs } => match (kind, &*lhs.borrow(), &*rhs.borrow()) {
-                (ExprBinary::Add, expr, Expr::Number(n)) => {
+            Expr::Binary {
+                kind,
+                lhs,
+                rhs,
+                swap_load,
+            } => match (kind, &*lhs.borrow(), &*rhs.borrow()) {
+                (ExprBinary::Add, expr, Expr::Number(n))
+                | (ExprBinary::Add, Expr::Number(n), expr)
+                | (ExprBinary::Sub, expr, Expr::Number(n)) => {
+                    let value = if matches!(kind, ExprBinary::Sub) {
+                        -n.value
+                    } else {
+                        n.value
+                    };
+
                     expr.generate(buf);
-                    buf.push(Instruction::Addi(
-                        Register::Result,
-                        Register::Result,
-                        Imm(n.value),
-                    ));
+
+                    buf.push(Instruction::Addi(buf.result, buf.result, Imm(value)));
                 }
-                (ExprBinary::Add, Expr::Number(n), expr) => {
-                    expr.generate(buf);
-                    buf.push(Instruction::Addi(
-                        Register::Result,
-                        Register::Result,
-                        Imm(-n.value),
-                    ));
+                (ExprBinary::Add, var @ Expr::Ident(..), expr)
+                | (ExprBinary::Add, expr, var @ Expr::Ident(..)) => {
+                    let base_res = buf.result;
+                    let (a_res, b_res) = generate_binary(buf, var, expr, *swap_load);
+
+                    buf.push(Instruction::Add(base_res, a_res, b_res));
                 }
-                _ => {}
+                (ExprBinary::Sub, a, b) => {
+                    let base_res = buf.result;
+                    let (a_res, b_res) = generate_binary(buf, a, b, *swap_load);
+
+                    buf.push(Instruction::Sub(base_res, a_res, b_res));
+                }
+                _ => todo!(),
             },
             Expr::Call(expr, exprs) => todo!(),
             Expr::Label(l) => {
                 buf.label_here(&*l.value);
             }
             Expr::Number(n) => {
-                buf.push(Instruction::Li(Register::Result, Imm(n.value)));
+                buf.push(Instruction::Li(buf.result, Imm(n.value)));
             }
         }
+    }
+}
+
+fn generate_binary(
+    buf: &mut GenerateBuf,
+    lhs: &Expr,
+    rhs: &Expr,
+    swap_load: bool,
+) -> (Register, Register) {
+    let base_res = buf.result;
+
+    if swap_load {
+        rhs.generate(buf);
+
+        buf.next_result();
+        lhs.generate(buf);
+
+        (buf.prev_result(), base_res)
+    } else {
+        lhs.generate(buf);
+
+        buf.next_result();
+        rhs.generate(buf);
+
+        (base_res, buf.prev_result())
     }
 }
