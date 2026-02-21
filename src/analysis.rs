@@ -1,23 +1,39 @@
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
+use std::any::TypeId;
+use std::mem;
 use std::ops::ControlFlow;
 
+use indexmap::IndexSet;
 use miette::Diagnostic;
 use thiserror::Error;
 
+use crate::shared_store::{StoreContainer, StoresContainer};
 use crate::{generator, nodes};
 
-pub type AnalyzeResult = ControlFlow<(), ()>;
+/// whether if re-analyze or not
+pub type AnalyzeResult = ControlFlow<bool, ()>;
 
 #[derive(Default)]
 pub struct AnalyzeSummary {
-    errors: Vec<AnalyzeError>,
-    stores: HashMap<TypeId, Box<dyn Any>>,
+    errors: IndexSet<(AnalyzeError, TypeId)>,
+    stores: StoresContainer,
 }
 
 impl AnalyzeSummary {
+    pub fn clear_store(&mut self) -> StoresContainer {
+        mem::replace(&mut self.stores, StoresContainer::default())
+    }
+
     pub fn error(&mut self, error: impl Into<AnalyzeError>) {
-        self.errors.push(error.into())
+        self.errors.insert((error.into(), TypeId::of::<()>()));
+    }
+
+    pub fn error_marked<M: 'static + Sized>(&mut self, error: impl Into<AnalyzeError>) {
+        self.errors.insert((error.into(), TypeId::of::<M>()));
+    }
+
+    pub fn remove_marked<M: 'static + Sized>(&mut self) {
+        self.errors
+            .retain(|(_, marker)| *marker != TypeId::of::<M>())
     }
 
     pub fn has_errors(&self) -> bool {
@@ -25,30 +41,18 @@ impl AnalyzeSummary {
     }
 
     pub fn report_on(self, source: String) {
-        for error in self.errors {
+        for (error, _) in self.errors {
             eprintln!(
                 "{:?}",
                 miette::Report::new(error).with_source_code(source.clone())
             );
         }
     }
-
-    pub fn store<T: AnalyzeStore>(&mut self) -> &mut T::Store {
-        let type_id = TypeId::of::<T>();
-
-        self.stores
-            .entry(type_id)
-            .or_insert_with(|| Box::from(T::Store::default()))
-            .downcast_mut()
-            .expect("`TypeId` ensures `Any` type safety")
-    }
 }
 
-pub trait AnalyzeStore: 'static + Sized {
-    type Store: Default;
-
-    fn store(summary: &mut AnalyzeSummary) -> &mut Self::Store {
-        summary.store::<Self>()
+impl StoreContainer for AnalyzeSummary {
+    fn container(&mut self) -> &mut StoresContainer {
+        &mut self.stores
     }
 }
 
@@ -58,14 +62,23 @@ pub trait Analyze {
     fn analyzed(&mut self) -> AnalyzeSummary {
         let mut summary = AnalyzeSummary::default();
 
-        _ = self.analyze(&mut summary);
+        while let AnalyzeResult::Break(true) = self.analyze(&mut summary) {}
 
         summary
     }
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 pub enum AnalyzeError {
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    FunctionExistsError(#[from] nodes::AnalyzeFunctionExistsError),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    FunctionMismatchArgsCountError(#[from] nodes::AnalyzeFunctionMismatchArgsCountError),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    FunctionNotExistsError(#[from] nodes::AnalyzeFunctionNotExistsError),
     #[error(transparent)]
     #[diagnostic(transparent)]
     InsNotExist(#[from] generator::AnalyzeInsNotExist),

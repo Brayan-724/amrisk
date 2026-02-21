@@ -12,6 +12,7 @@ mod generator;
 mod nodes;
 mod parser;
 mod pretty;
+mod shared_store;
 
 fn main() {
     miette::set_hook(Box::new(|_| Box::new(GraphicalReportHandler::new()))).unwrap();
@@ -24,8 +25,11 @@ fn main() {
 
     println!("{}", ast.pretty_printed(src));
 
-    let summary = ast.analyzed();
+    let mut summary = ast.analyzed();
     let has_errors = summary.has_errors();
+
+    let mut store = summary.clear_store();
+    store.clear_local();
 
     summary.report_on(src.into());
 
@@ -33,8 +37,7 @@ fn main() {
         return;
     }
 
-    let buf = ast.generated();
+    let buf = ast.generated(store);
 
-    println!("{buf:#?}");
     println!("{buf:#}");
 }

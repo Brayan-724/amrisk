@@ -3,6 +3,7 @@ mod linked_vector;
 mod registers;
 
 use std::fmt::{self, Write};
+use std::mem;
 use std::ops::ControlFlow;
 
 use miette::Diagnostic;
@@ -13,8 +14,9 @@ pub use registers::*;
 
 use crate::nodes::Ident;
 use crate::parser::Span;
+use crate::shared_store::{StoreContainer, StoresContainer};
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Instruction does not exist")]
 pub struct AnalyzeInsNotExist {
     #[label]
@@ -33,6 +35,7 @@ pub struct GenerateBuf {
     labels: Vec<(Box<str>, usize)>,
     stack: Vec<(Box<str>, usize)>,
     pub result: Register,
+    stores: StoresContainer,
 }
 
 impl Default for GenerateBuf {
@@ -43,14 +46,22 @@ impl Default for GenerateBuf {
             labels: Vec::new(),
             stack: Vec::new(),
             result: Register::Result,
+            stores: StoresContainer::default(),
         }
     }
 }
 
+impl StoreContainer for GenerateBuf {
+    fn container(&mut self) -> &mut StoresContainer {
+        &mut self.stores
+    }
+}
+
 impl GenerateBuf {
-    pub fn new(ctx: GenerateCtx) -> Self {
+    pub fn new(ctx: GenerateCtx, stores: StoresContainer) -> Self {
         Self {
             ctx,
+            stores,
             ..Default::default()
         }
     }
@@ -118,6 +129,7 @@ impl GenerateBuf {
             Register::Result => Register::Local(0),
             Register::Local(n @ 0..=5) => Register::Local(n + 1),
             Register::Local(6..) => todo!(),
+            Register::Argument(..) => Register::Result,
             _ => unreachable!(),
         }
     }
@@ -179,12 +191,24 @@ impl fmt::Display for GenerateBuf {
 pub trait Generate {
     fn generate(&self, buf: &mut GenerateBuf);
 
-    fn generated(&self) -> GenerateBuf {
-        let mut buf = GenerateBuf::default();
+    fn generated(&self, stores: StoresContainer) -> GenerateBuf {
+        let mut buf = GenerateBuf::new(GenerateCtx::default(), stores);
 
         self.generate(&mut buf);
 
         buf
+    }
+
+    fn generated_child(&self, buf: &mut GenerateBuf) -> GenerateBuf {
+        let mut child = GenerateBuf::default();
+
+        mem::swap(&mut child.stores, &mut buf.stores);
+
+        self.generate(&mut child);
+
+        mem::swap(&mut child.stores, &mut buf.stores);
+
+        child
     }
 }
 

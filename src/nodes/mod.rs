@@ -18,7 +18,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 
 /// Identificator of functions or variables
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Ident(pub Rc<str>);
 
@@ -64,7 +64,7 @@ impl Generate for Program {
     }
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Missing semicolon")]
 pub struct AnalyzeMissingSemicolon {
     #[label("expected a semicolon")]

@@ -6,11 +6,12 @@ use amrisk_macros::Node;
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::analysis::{Analyze, AnalyzeResult, AnalyzeStore, AnalyzeSummary};
+use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
 use crate::generator::{Generate, GenerateBuf, Instruction, Offset, Register};
 use crate::nodes::{Block, Expr, ExprBinary, Ident};
 use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
+use crate::shared_store::SharedStore;
 
 #[derive(Debug, Clone, Node)]
 #[node(analyzer, generator, pretty, spanned)]
@@ -64,8 +65,8 @@ impl PrettyPrint for StmtExpr {
 }
 
 impl Analyze for StmtExpr {
-    fn analyze(&mut self, _: &mut AnalyzeSummary) -> AnalyzeResult {
-        AnalyzeResult::Continue(())
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        self.expr.analyze(summary)
     }
 }
 
@@ -152,15 +153,13 @@ impl PrettyPrint for StmtLet {
     }
 }
 
-impl AnalyzeStore for StmtLet {
+impl SharedStore<AnalyzeSummary> for StmtLet {
     type Store = StmtLetStore;
 }
 
 impl Analyze for StmtLet {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
-        let store = Self::store(summary);
-
-        store
+        Self::store(summary)
             .local_vars
             .insert(self.name.0.clone(), self.name.span());
 
@@ -242,7 +241,7 @@ impl PrettyPrint for StmtWhile {
     }
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("While loops must have comparation expression")]
 pub struct AnalyzeWhileConditionError {
     #[label]

@@ -144,6 +144,7 @@ macro_rules! instructions {
     ( @arg-ty [rd] ) => {Register};
     ( @arg-ty [symbol] ) => {Offset};
     ( @arg-ty [offset] ) => {Offset};
+    ( @arg-ty [goffset] ) => {Offset};
 
     ( @arg-from [$s:ident] [immediate] [$e:expr] ) => {Imm::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [imm] [$e:expr]) => {Imm::from_expr($e, $s)?};
@@ -153,6 +154,7 @@ macro_rules! instructions {
     ( @arg-from [$s:ident] [rd] [$e:expr]) => {Register::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [symbol] [$e:expr]) => {Offset::from_expr($e, $s)?};
     ( @arg-from [$s:ident] [offset] [$e:expr]) => {Offset::from_expr($e, $s)?};
+    ( @arg-from [$s:ident] [goffset] [$e:expr]) => {Offset::from_expr($e, $s)?};
 
     ( @arg-mock [immediate] ) => {Imm(0)};
     ( @arg-mock [imm] ) => {Imm(0)};
@@ -162,6 +164,7 @@ macro_rules! instructions {
     ( @arg-mock [rd] ) => {Register::Zero};
     ( @arg-mock [symbol] ) => {Offset::Imm(0)};
     ( @arg-mock [offset] ) => {Offset::Imm(0)};
+    ( @arg-mock [goffset] ) => {Offset::Imm(0)};
 
     ( @arg-offset [$rhs:ident] [$arg:ident] [symbol] ) => {$arg + $rhs.to_owned()};
     ( @arg-offset [$rhs:ident] [$arg:ident] [offset] ) => {$arg + $rhs.to_owned()};
@@ -350,8 +353,8 @@ instructions! {
 [Fsw] [fsw] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fsw rd, symbol[11:0](rt)]] ["Store global de float word"];
 [Fsd] [fsd] [rd, symbol, rt] [[auipc rt, symbol[31:12]] [fsd rd, symbol[11:0](rt)]] ["Store global de float double"];
 
-[Li] [li] [rd, immediate] [Muchas secuencias] ["Load immediate"];
-[Mv] [mv] [rd, rs] [addi rd, rs, 0] ["Copiar registro"];
+[Li] [li] [rd, immediate] [Many sequences ] ["Load immediate"];
+[Mv] [mv] [rd, rs] [addi rd, rs, 0] ["Copy register"];
 [Not] [not] [rd, rs] [xori rd, rs, -1] ["Complemento a uno"];
 [SextW] [sextw (sext.w)] [rd, rs] [addiw rd, rs, 0] ["Sign extend word"];
 [Seqz] [seqz] [rd, rs] [sltiu rd, rs, 1] ["Poner en 1 si = cero"];
@@ -367,7 +370,7 @@ instructions! {
 [Bleu] [bleu] [rs, rt, offset] [bgeu rt, rs, offset] ["Branch si <=, unsigned"];
 [Jal] [jal] [offset] [jal x1, offset] ["Jump and link"];
 [Jalr] [jalr] [rs] [jalr x1, rs, 0] ["Jump and link a registro"];
-[Call] [call] [offset] [[auipc x1, offset[31:12]] [jalrx1, x1, offset[11:0]]] ["Llamar subrutina lejana"];
+[Call] [call] [goffset] [[auipc x1, offset[31:12]] [jalrx1, x1, offset[11:0]]] ["Llamar subrutina lejana"];
 [FenceAll] [fence] [] [fence iorw, iorw] ["Fence en toda la memoria e I/O"];
 // [Fscsr] [fscsr] [rd, rs] [csrrw rd, fcsr, rs] ["Swap con FP control/status register"];
 // [Fsrm] [fsrm] [rd, rs] [csrrw rd, frm, rs] ["Swap con FP rounding mode"];

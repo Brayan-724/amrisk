@@ -1,16 +1,17 @@
+use std::any::TypeId;
 use std::cell::RefCell;
-use std::io::BufRead;
-use std::{fmt, mem};
+use std::fmt;
 
 use amrisk_macros::Node;
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::analysis::{Analyze, AnalyzeResult, AnalyzeStore, AnalyzeSummary};
+use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
 use crate::generator::{Generate, GenerateBuf, Imm, Instruction, Offset, Register};
-use crate::nodes::{Block, Ident};
+use crate::nodes::{Block, FunctionSharedStore, Ident, ItemFunction};
 use crate::parser::{IntoSpanned, Span, Spanned};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
+use crate::shared_store::{SharedStore, StoreContainer};
 
 use super::StmtLet;
 
@@ -30,18 +31,6 @@ pub enum Expr {
     Call(Box<RefCell<Expr>>, Vec<Expr>),
     Label(Spanned<Ident>),
     Number(Spanned<i32>),
-}
-
-#[derive(Default)]
-pub struct ExprAnalyzeStore {
-    binary_cost: usize,
-}
-
-#[derive(Debug, Error, Diagnostic)]
-#[error("Variable does not exist")]
-pub struct AnalyzeVariableNotExistsError {
-    #[label]
-    location: Span,
 }
 
 impl IntoSpanned for Expr {
@@ -134,8 +123,43 @@ impl PrettyPrint for RefCell<Expr> {
     }
 }
 
-impl AnalyzeStore for Expr {
+#[derive(Default)]
+pub struct ExprAnalyzeStore {
+    binary_cost: usize,
+    in_callee: bool,
+}
+
+impl SharedStore<AnalyzeSummary> for Expr {
     type Store = ExprAnalyzeStore;
+}
+
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("Variable does not exist")]
+pub struct AnalyzeVariableNotExistsError {
+    #[label]
+    location: Span,
+}
+
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("Function does not exist")]
+pub struct AnalyzeFunctionNotExistsError {
+    #[label]
+    location: Span,
+}
+
+pub struct AnalyzeFunctionNotExistsMarker;
+
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("Function mismatch arguments count, expected {expected}")]
+pub struct AnalyzeFunctionMismatchArgsCountError {
+    #[label(primary, "Provided {provided}...")]
+    location: Span,
+    provided: usize,
+
+    #[label("...but expected {expected}")]
+    original: Span,
+
+    expected: usize,
 }
 
 impl Analyze for Expr {
@@ -197,12 +221,47 @@ impl Analyze for Expr {
                     *self = next_expr;
                 }
             }
-            Expr::Call(expr, exprs) => {
-                expr.analyze(summary)?;
+            Expr::Call(callee, exprs) => {
+                {
+                    let Expr::Ident(i) = &*callee.borrow() else {
+                        todo!("Expr is not ident")
+                    };
+
+                    let Some(func) = summary.shared_store::<ItemFunction>().functions.get(i) else {
+                        summary.error_marked::<AnalyzeFunctionNotExistsMarker>(
+                            AnalyzeFunctionNotExistsError { location: i.span() },
+                        );
+                        return AnalyzeResult::Continue(());
+                    };
+
+                    let args = &func.args;
+
+                    if args.args.len() != exprs.len() {
+                        let original = args.span();
+                        let expected = args.args.len();
+
+                        summary.error(AnalyzeFunctionMismatchArgsCountError {
+                            location: exprs.span(),
+                            provided: exprs.len(),
+                            original,
+                            expected,
+                        });
+
+                        return AnalyzeResult::Continue(());
+                    }
+                }
+
+                let prev_in_callee = summary.store::<Expr>().in_callee;
+                summary.store::<Expr>().in_callee = true;
+                callee.analyze(summary)?;
+                summary.store::<Expr>().in_callee = prev_in_callee;
+
                 exprs.analyze(summary)?;
             }
             Expr::Ident(var) => {
-                if !summary.store::<StmtLet>().local_vars.contains_key(&var.0) {
+                if !summary.store::<StmtLet>().local_vars.contains_key(&var.0)
+                    && !summary.store::<Expr>().in_callee
+                {
                     summary.error(AnalyzeVariableNotExistsError {
                         location: var.span(),
                     });
@@ -287,7 +346,25 @@ impl Generate for Expr {
                 }
                 _ => todo!(),
             },
-            Expr::Call(expr, exprs) => todo!(),
+            Expr::Call(expr, exprs) => {
+                let Expr::Ident(name) = &*expr.borrow() else {
+                    unreachable!("[analyzer] Call expr filters ident callee ")
+                };
+                let name = &**name;
+
+                let Some(func) = buf.shared_store::<ItemFunction>().functions.get(name) else {
+                    unreachable!("[analyzer] Call expr ensures callee exists")
+                };
+
+                let func = func.name.0.clone();
+
+                for (idx, expr) in exprs.iter().enumerate() {
+                    buf.result = Register::Argument(idx as u8);
+                    expr.generate(buf);
+                }
+
+                buf.push(Instruction::Call(Offset::Label(func)));
+            }
             Expr::Label(l) => {
                 buf.label_here(&*l.value);
             }

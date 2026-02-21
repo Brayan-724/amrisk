@@ -12,7 +12,7 @@ use crate::parser::{IntoSpanned, Span};
 #[repr(transparent)]
 pub struct Imm(pub i32);
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Not an immediate")]
 pub struct AnalyzeImmInvalid {
     #[label("expected an immediate")]
@@ -56,7 +56,7 @@ pub enum Offset {
     Relative(i32, Register),
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Not a offset")]
 pub struct AnalyzeOffsetInvalid {
     #[label("expected a offset")]
@@ -151,14 +151,14 @@ pub enum Register {
     Argument(u8),
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic)]
 #[error("Unknown register")]
 pub struct AnalyzeRegNotFound {
     #[label("expected a valid register")]
     location: Span,
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Not a register")]
 pub struct AnalyzeRegInvalid {
     #[label("expected a register")]

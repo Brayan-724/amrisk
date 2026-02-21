@@ -50,7 +50,7 @@ pub fn parse(input: &str) -> Result<Program, ParseError> {
     })
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Hash, Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     pub start: usize,
     pub len: usize,

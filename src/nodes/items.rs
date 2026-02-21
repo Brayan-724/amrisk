@@ -1,12 +1,19 @@
+use std::collections::HashMap;
 use std::fmt::{self, Write as _};
+use std::rc::Rc;
 
 use amrisk_macros::Node;
+use miette::Diagnostic;
+use thiserror::Error;
 
 use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
 use crate::generator::{Generate, GenerateBuf, Imm, Instruction, Offset, Register};
 use crate::nodes::{Block, Ident};
 use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
+use crate::shared_store::{SharedStore, StoreContainer};
+
+use super::AnalyzeFunctionNotExistsMarker;
 
 /// Declarations
 #[derive(Debug, Clone, Node)]
@@ -25,6 +32,21 @@ pub struct ItemFunction {
     pub args: FnArgs,
     pub ret: Option<Spanned<Ident>>,
     pub body: Block,
+}
+
+pub struct FunctionDefinition {
+    pub name: Spanned<Ident>,
+    pub args: FnArgs,
+    pub ret: Option<Spanned<Ident>>,
+}
+
+#[derive(Default)]
+pub struct FunctionSharedStore {
+    pub functions: HashMap<Ident, FunctionDefinition>,
+}
+
+impl SharedStore for ItemFunction {
+    type Store = FunctionSharedStore;
 }
 
 impl IntoSpanned for ItemFunction {
@@ -50,8 +72,39 @@ impl PrettyPrint for ItemFunction {
     }
 }
 
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("Function already exists")]
+pub struct AnalyzeFunctionExistsError {
+    #[label(primary)]
+    location: Span,
+
+    #[label("Previous declaration")]
+    original: Span,
+}
+
 impl Analyze for ItemFunction {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        if let Some(previous) = summary.shared_store::<Self>().functions.insert(
+            (&*self.name).clone(),
+            FunctionDefinition {
+                name: self.name.clone(),
+                args: self.args.clone(),
+                ret: self.ret.clone(),
+            },
+        ) {
+            if previous.name.span != self.name.span {
+                summary.error(AnalyzeFunctionExistsError {
+                    location: self.name.span(),
+                    original: previous.name.span,
+                });
+
+                return AnalyzeResult::Break(false);
+            }
+        } else {
+            summary.remove_marked::<AnalyzeFunctionNotExistsMarker>();
+            return AnalyzeResult::Break(true);
+        }
+
         self.body.analyze(summary)
     }
 }
@@ -60,7 +113,7 @@ impl Generate for ItemFunction {
     fn generate(&self, buf: &mut GenerateBuf) {
         buf.label_here(&**self.name);
 
-        let child = self.body.generated();
+        let child = self.body.generated_child(buf);
         let child_stack = child.stack_size() as i32;
 
         let stack_size = child_stack + 4; // Plus return pointer
