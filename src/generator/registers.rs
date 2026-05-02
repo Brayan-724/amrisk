@@ -172,14 +172,14 @@ impl Register {
                 $($($pattern:literal)|* => $static:expr,)*
 
                 $(Self::$listed:ident ($prefix:literal) => {
-                    $([$x:literal, $named:literal] => $integer:literal,)*
+                    $($x:literal => $integer:literal,)*
                 })*
             }) => {
                 match $value {
                     $($($pattern)|* => Some($static),)*
 
                     $($(
-                    concat!("x", $x) | concat!($prefix, $named) => Some(Self::$listed($integer)),
+                    concat!("x", $x) | concat!($prefix, $integer) => Some(Self::$listed($integer)),
                     )*)*
 
                     _ => {
@@ -205,37 +205,37 @@ impl Register {
                     "x8" | "s0" | "fp" => Self::Result,
 
                     Self::Local("t") => {
-                        [6, 1] => 0,
-                        [7, 2] => 1,
-                        [28, 3] => 2,
-                        [29, 4] => 4,
-                        [30, 5] => 5,
-                        [31, 6] => 6,
+                        6 => 0,
+                        7 => 1,
+                        28 => 2,
+                        29 => 4,
+                        30 => 5,
+                        31 => 6,
                     }
 
                     Self::Saved("s") => {
-                        [9, 1] => 0,
-                        [18, 2] => 1,
-                        [19, 3] => 2,
-                        [20, 4] => 4,
-                        [21, 5] => 5,
-                        [22, 6] => 6,
-                        [23, 7] => 7,
-                        [24, 8] => 8,
-                        [25, 9] => 9,
-                        [26, 10] => 10,
-                        [27, 11] => 11,
+                        9 => 0,
+                        18 => 1,
+                        19 => 2,
+                        20 => 4,
+                        21 => 5,
+                        22 => 6,
+                        23 => 7,
+                        24 => 8,
+                        25 => 9,
+                        26 => 10,
+                        27 => 11,
                     }
 
                     Self::Argument("a") => {
-                        [10, 0] => 0,
-                        [11, 1] => 1,
-                        [12, 2] => 2,
-                        [13, 3] => 3,
-                        [14, 4] => 4,
-                        [15, 5] => 5,
-                        [16, 6] => 6,
-                        [17, 7] => 7,
+                        10 => 0,
+                        11 => 1,
+                        12 => 2,
+                        13 => 3,
+                        14 => 4,
+                        15 => 5,
+                        16 => 6,
+                        17 => 7,
                     }
                 })
             }
