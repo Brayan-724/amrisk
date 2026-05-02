@@ -97,7 +97,7 @@ fn node_derive_enum(
         });
 
         quote! {const _: () = {
-            use ::amrisk::parser::*;
+            use crate::parser::*;
             impl IntoSpanned for #struct_id {
                 fn span(&self) -> Span {
                     match self {
@@ -126,7 +126,7 @@ fn node_derive_enum(
         });
 
         quote! {const _: () = {
-            use ::amrisk::pretty::*;
+            use crate::pretty::*;
             impl PrettyPrint for #struct_id {
                 fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
                     match self {
@@ -155,7 +155,7 @@ fn node_derive_enum(
         });
 
         quote! {const _: () = {
-            use ::amrisk::analysis::*;
+            use crate::analysis::*;
             impl Analyze for #struct_id {
                 fn analyze(&mut self, s: &mut AnalyzeSummary) -> AnalyzeResult {
                     match self {
@@ -184,7 +184,7 @@ fn node_derive_enum(
         });
 
         quote! {const _: () = {
-            use ::amrisk::generator::*;
+            use crate::generator::*;
             impl Generate for #struct_id {
                 fn generate(&self, b: &mut GenerateBuf) {
                     match self {

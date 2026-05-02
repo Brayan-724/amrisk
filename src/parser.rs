@@ -12,12 +12,12 @@ use crate::nodes::Program;
 #[error("Error parsing input")]
 pub struct ParseError {
     #[source_code]
-    src: String,
+    pub src: String,
 
-    expected: String,
+    pub expected: String,
 
     #[label("{expected}")]
-    location: miette::SourceSpan,
+    pub location: miette::SourceSpan,
 }
 
 impl ParseError {

@@ -210,7 +210,9 @@ impl Analyze for StmtLoop {
 }
 
 impl Generate for StmtLoop {
-    fn generate(&self, buf: &mut GenerateBuf) {}
+    fn generate(&self, _buf: &mut GenerateBuf) {
+        todo!("loop statement")
+    }
 }
 
 ////////////////////
@@ -273,5 +275,7 @@ impl Analyze for StmtWhile {
 }
 
 impl Generate for StmtWhile {
-    fn generate(&self, buf: &mut GenerateBuf) {}
+    fn generate(&self, _buf: &mut GenerateBuf) {
+        todo!("while statement")
+    }
 }

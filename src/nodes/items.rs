@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{self, Write as _};
-use std::rc::Rc;
 
 use amrisk_macros::Node;
 use miette::Diagnostic;
@@ -76,10 +75,10 @@ impl PrettyPrint for ItemFunction {
 #[error("Function already exists")]
 pub struct AnalyzeFunctionExistsError {
     #[label(primary)]
-    location: Span,
+    pub location: Span,
 
     #[label("Previous declaration")]
-    original: Span,
+    pub original: Span,
 }
 
 impl Analyze for ItemFunction {

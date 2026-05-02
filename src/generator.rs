@@ -1,5 +1,4 @@
 mod instructions;
-mod linked_vector;
 mod registers;
 
 use std::fmt::{self, Write};
@@ -20,7 +19,7 @@ use crate::shared_store::{StoreContainer, StoresContainer};
 #[error("Instruction does not exist")]
 pub struct AnalyzeInsNotExist {
     #[label]
-    location: Span,
+    pub location: Span,
 }
 
 #[derive(Default, Debug)]

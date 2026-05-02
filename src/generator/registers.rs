@@ -16,7 +16,7 @@ pub struct Imm(pub i32);
 #[error("Not an immediate")]
 pub struct AnalyzeImmInvalid {
     #[label("expected an immediate")]
-    location: Span,
+    pub location: Span,
 }
 
 impl Imm {
@@ -60,7 +60,7 @@ pub enum Offset {
 #[error("Not a offset")]
 pub struct AnalyzeOffsetInvalid {
     #[label("expected a offset")]
-    location: Span,
+    pub location: Span,
 }
 
 impl ops::Add<String> for Offset {
@@ -151,18 +151,18 @@ pub enum Register {
     Argument(u8),
 }
 
-#[derive(Hash, Debug, Error, Diagnostic)]
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Unknown register")]
 pub struct AnalyzeRegNotFound {
     #[label("expected a valid register")]
-    location: Span,
+    pub location: Span,
 }
 
 #[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Not a register")]
 pub struct AnalyzeRegInvalid {
     #[label("expected a register")]
-    location: Span,
+    pub location: Span,
 }
 
 impl Register {

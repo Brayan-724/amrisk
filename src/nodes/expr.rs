@@ -1,4 +1,3 @@
-use std::any::TypeId;
 use std::cell::RefCell;
 use std::fmt;
 
@@ -8,7 +7,7 @@ use thiserror::Error;
 
 use crate::analysis::{Analyze, AnalyzeResult, AnalyzeSummary};
 use crate::generator::{Generate, GenerateBuf, Imm, Instruction, Offset, Register};
-use crate::nodes::{Block, FunctionSharedStore, Ident, ItemFunction};
+use crate::nodes::{Block, Ident, ItemFunction};
 use crate::parser::{IntoSpanned, Span, Spanned};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::{SharedStore, StoreContainer};
@@ -137,14 +136,14 @@ impl SharedStore<AnalyzeSummary> for Expr {
 #[error("Variable does not exist")]
 pub struct AnalyzeVariableNotExistsError {
     #[label]
-    location: Span,
+    pub location: Span,
 }
 
 #[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
 #[error("Function does not exist")]
 pub struct AnalyzeFunctionNotExistsError {
     #[label]
-    location: Span,
+    pub location: Span,
 }
 
 pub struct AnalyzeFunctionNotExistsMarker;
@@ -153,13 +152,13 @@ pub struct AnalyzeFunctionNotExistsMarker;
 #[error("Function mismatch arguments count, expected {expected}")]
 pub struct AnalyzeFunctionMismatchArgsCountError {
     #[label(primary, "Provided {provided}...")]
-    location: Span,
-    provided: usize,
+    pub location: Span,
+    pub provided: usize,
 
     #[label("...but expected {expected}")]
-    original: Span,
+    pub original: Span,
 
-    expected: usize,
+    pub expected: usize,
 }
 
 impl Analyze for Expr {
@@ -311,7 +310,7 @@ impl Generate for Expr {
 
                 buf.push(inst);
             }
-            Expr::Block(block) => todo!(),
+            Expr::Block(_block) => todo!("block expression"),
             Expr::Binary {
                 kind,
                 lhs,

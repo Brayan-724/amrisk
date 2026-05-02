@@ -68,7 +68,7 @@ impl Generate for Program {
 #[error("Missing semicolon")]
 pub struct AnalyzeMissingSemicolon {
     #[label("expected a semicolon")]
-    location: Span,
+    pub location: Span,
 }
 
 #[derive(Debug, Clone)]

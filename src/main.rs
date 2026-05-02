@@ -1,18 +1,9 @@
-pub use crate as amrisk;
-
 use miette::GraphicalReportHandler;
 
-use crate::analysis::Analyze;
-use crate::generator::Generate;
-use crate::parser::ParseError;
-use crate::pretty::PrettyPrint as _;
-
-mod analysis;
-mod generator;
-mod nodes;
-mod parser;
-mod pretty;
-mod shared_store;
+use amrisk::analysis::Analyze;
+use amrisk::generator::Generate;
+use amrisk::parser::{self, ParseError};
+use amrisk::pretty::PrettyPrint as _;
 
 fn main() {
     miette::set_hook(Box::new(|_| Box::new(GraphicalReportHandler::new()))).unwrap();
