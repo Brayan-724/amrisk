@@ -198,8 +198,8 @@ pub trait Generate {
         buf
     }
 
-    fn generated_child(&self, buf: &mut GenerateBuf) -> GenerateBuf {
-        let mut child = GenerateBuf::default();
+    fn generated_child(&self, buf: &mut GenerateBuf, base: GenerateBuf) -> GenerateBuf {
+        let mut child = base;
 
         mem::swap(&mut child.stores, &mut buf.stores);
 

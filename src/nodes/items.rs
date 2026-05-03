@@ -103,6 +103,14 @@ impl Analyze for ItemFunction {
             return AnalyzeResult::Break(true);
         }
 
+        for arg in &self.args.args {
+            summary
+                .store::<StmtLet>()
+                .local_vars
+                .entry(arg.name.0.clone())
+                .insert_entry(arg.name.span());
+        }
+
         self.body.analyze(summary)
     }
 }
@@ -111,7 +119,16 @@ impl Generate for ItemFunction {
     fn generate(&self, buf: &mut GenerateBuf) {
         buf.label_here(&**self.name);
 
-        let child = self.body.generated_child(buf);
+        let mut buf_child = GenerateBuf::default();
+
+        let args_stack = self
+            .args
+            .args
+            .iter()
+            .map(|arg| buf_child.push_stack(&*arg.name.0, 4))
+            .collect::<Vec<_>>();
+
+        let child = self.body.generated_child(buf, buf_child);
         let child_stack = child.stack_size() as i32;
 
         let stack_size = child_stack + 4; // Plus return pointer
@@ -129,6 +146,14 @@ impl Generate for ItemFunction {
             Offset::Imm(child_stack),
             Register::Stack,
         ));
+
+        for (idx, arg_stack) in args_stack.into_iter().enumerate() {
+            buf.push(Instruction::Sw(
+                Register::Argument(idx as u8),
+                Offset::Imm(arg_stack as i32),
+                Register::Stack,
+            ));
+        }
 
         buf.extend_on(child, format!(".{}.", self.name.value.0));
 
