@@ -1,5 +1,6 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::mem;
 
 #[derive(Debug, Default)]
 pub struct StoresContainer {
@@ -51,6 +52,10 @@ pub trait SharedStore<C: StoreContainer = StoresContainer>: 'static + Sized {
 
 pub trait StoreContainer: 'static + Sized {
     fn container(&mut self) -> &mut StoresContainer;
+
+    fn clear_store<S: SharedStore<Self>>(&mut self) {
+        mem::swap(S::store(self), &mut S::Store::default());
+    }
 
     fn store<T: SharedStore<Self>>(&mut self) -> &mut T::Store {
         StoresContainer::store::<_, T>(self)

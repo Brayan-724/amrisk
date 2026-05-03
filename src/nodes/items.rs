@@ -83,6 +83,8 @@ pub struct AnalyzeFunctionExistsError {
 
 impl Analyze for ItemFunction {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        summary.clear_store::<StmtLet>();
+
         if let Some(previous) = summary.shared_store::<Self>().functions.insert(
             (&*self.name).clone(),
             FunctionDefinition {

@@ -19,7 +19,7 @@ fn main() {
     let mut summary = ast.analyzed();
     let has_errors = summary.has_errors();
 
-    let mut store = summary.clear_store();
+    let mut store = summary.clear_stores();
     store.clear_local();
 
     summary.report_on(src.into());

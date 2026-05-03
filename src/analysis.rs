@@ -19,7 +19,7 @@ pub struct AnalyzeSummary {
 }
 
 impl AnalyzeSummary {
-    pub fn clear_store(&mut self) -> StoresContainer {
+    pub fn clear_stores(&mut self) -> StoresContainer {
         mem::replace(&mut self.stores, StoresContainer::default())
     }
 

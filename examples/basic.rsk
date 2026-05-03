@@ -26,14 +26,34 @@
 //   ret();
 // }
 
-
-fn add(a: int) { }
+// SAFE VERSION
+// fn memcopy(src: word, dst: word, size: half) {
+//   let end = src + dst;
+// 
+//   while (end - src > 4) {
+//     let buf = *w src;
+//     *w dst = buf;
+// 
+//     src = src + 4;
+//     dst = dst + 4;
+//   }
+// 
+//   while (src != end) {
+//     let buf = *b src;
+//     *b dst = buf;
+// 
+//     src = src + 1;
+//     dst = dst + 1;
+//   }
+// 
+//   dst
+// }
 
 fn main() {
   let a = 1;
   let b = 2;
 
-  add(a);
+  add(a, b);
 
   // print_int(a)
   // let a = 1;
@@ -42,4 +62,8 @@ fn main() {
   // add(x, y)
 }
 
-// vim: ft=rs
+fn add(a: int, b: int) { 
+  a + b
+}
+
+// vim: set ft=rust
