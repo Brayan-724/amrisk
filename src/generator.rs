@@ -111,6 +111,7 @@ impl GenerateBuf {
     pub fn get_stack(&self, name: &str) -> Option<(usize, usize)> {
         self.stack
             .iter()
+            .rev()
             .try_fold(0, |offset, (var, size)| {
                 if &**var == name {
                     ControlFlow::Break((offset, *size))
@@ -119,6 +120,7 @@ impl GenerateBuf {
                 }
             })
             .break_value()
+            .map(|(rev_offset, size)| (self.stack_size() - rev_offset - size, size))
     }
 
     pub fn next_result_peek(&self) -> Register {

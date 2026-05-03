@@ -168,8 +168,8 @@ impl Analyze for StmtLet {
 
 impl Generate for StmtLet {
     fn generate(&self, buf: &mut GenerateBuf) {
-        let offset = buf.push_stack(&**self.name, 4);
         self.expr.generate(buf);
+        let offset = buf.push_stack(&**self.name, 4);
         buf.push(Instruction::Sw(
             buf.result,
             Offset::Imm(offset as i32),
