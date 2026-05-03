@@ -52,23 +52,17 @@
 #[entry]
 fn main() {
   let a = 1;
-  let b = 2;
-  let b = b;
-  let b = b;
 
-  let c = add(a, b);
-
-  let d = add(c, c);
-
-  // print_int(a)
-  // let a = 1;
-  // let b = 2;
-
-  // add(x, y)
+  if a == 1 {
+      let c = add(a, b);
+  }
+  // else {
+  //     let c = add(a, b);
+  // }
 }
 
 fn add(a: int, b: int) { 
   a + b
 }
 
-// vim: set ft=rust
+// vim: set ft=rust:

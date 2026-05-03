@@ -86,6 +86,9 @@ pub enum AnalyzeError {
     CalleeIsNotIdent(#[from] nodes::AnalyzeCalleeIsNotIdent),
     #[error(transparent)]
     #[diagnostic(transparent)]
+    ExpectedCondition(#[from] nodes::AnalyzeExpectedCondition),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     FunctionExistsError(#[from] nodes::AnalyzeFunctionExistsError),
     #[error(transparent)]
     #[diagnostic(transparent)]
@@ -117,9 +120,6 @@ pub enum AnalyzeError {
     #[error(transparent)]
     #[diagnostic(transparent)]
     VariableNotExistsError(#[from] nodes::AnalyzeVariableNotExistsError),
-    #[error(transparent)]
-    #[diagnostic(transparent)]
-    WhileConditionError(#[from] nodes::AnalyzeWhileConditionError),
 }
 
 impl<T: Analyze> Analyze for Vec<T> {

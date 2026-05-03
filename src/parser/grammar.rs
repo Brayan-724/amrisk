@@ -65,7 +65,7 @@ peg::parser!(
         //////////////////// STATEMENTS
         ////////////////////
 
-        rule stmt() -> Statement = stmt_let() / stmt_loop() / stmt_while() / stmt_label() / stmt_expr()
+        rule stmt() -> Statement = stmt_if() / stmt_let() / stmt_loop() / stmt_while() / stmt_label() / stmt_expr()
 
         rule stmt_expr() -> Statement =
             e:block() _?
@@ -74,6 +74,13 @@ peg::parser!(
             /
             e:expr() semi:eol()
         { Statement::Expr(StmtExpr { expr: e, semi }) }
+
+        rule stmt_if() -> Statement =
+            if_:T(Token::If) _?
+            cond:expr() _?
+            body:block() _?
+            otherwise:(else_:TP(Token::Else) _? otherwise:block() {(else_, otherwise)})? _?
+        { Statement::If(StmtIf { if_, cond, body, otherwise }) }
 
         rule stmt_label() -> Statement =
             squot:TP(Token::SQuot) _?

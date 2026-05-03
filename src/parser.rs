@@ -189,7 +189,9 @@ macro_rules! def_tokens {
 
 def_tokens! (
 Keywords {
+    Else = "else";
     Fn = "fn";
+    If = "if";
     Let = "let";
     Loop = "loop";
     Unsafe = "unsafe";

@@ -17,6 +17,7 @@ use crate::shared_store::SharedStore;
 #[node(analyzer, generator, pretty, spanned)]
 pub enum Statement {
     Expr(StmtExpr),
+    If(StmtIf),
     Label(StmtLabel),
     Let(StmtLet),
     Loop(StmtLoop),
@@ -75,6 +76,91 @@ impl Generate for StmtExpr {
         }
 
         self.expr.generate(buf);
+    }
+}
+
+////////////////////
+//////////////////// If
+////////////////////
+
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("{statement} must have comparation expression")]
+pub struct AnalyzeExpectedCondition {
+    #[label]
+    location: Span,
+
+    statement: &'static str,
+}
+
+impl AnalyzeExpectedCondition {
+    pub fn analyze(cond: &Expr, statement: &'static str) -> Option<Self> {
+        match cond {
+            Expr::Binary {
+                kind:
+                    ExprBinary::Eq
+                    | ExprBinary::Ne
+                    | ExprBinary::Gt
+                    | ExprBinary::Ge
+                    | ExprBinary::Lt
+                    | ExprBinary::Le,
+                ..
+            } => None,
+            _ => Some(AnalyzeExpectedCondition {
+                location: cond.span(),
+                statement,
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtIf {
+    pub if_: Spanned<Token>,
+    pub cond: Expr,
+    pub body: Block,
+    pub otherwise: Option<(Spanned<Token>, Block)>,
+}
+
+impl IntoSpanned for StmtIf {
+    fn span(&self) -> Span {
+        if let Some(otherwise) = &self.otherwise {
+            self.if_.span.merge(otherwise.1.span())
+        } else {
+            self.if_.span.merge(self.body.span())
+        }
+    }
+}
+
+impl PrettyPrint for StmtIf {
+    fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
+        let mut node = f
+            .node("Statment::If", self.span())?
+            .field_child("cond", &self.cond)?
+            .field_child("body", &self.body)?;
+
+        if let Some((_, otherwise)) = &self.otherwise {
+            node = node.field_child("otherwise", otherwise)?;
+        }
+
+        node.finish()
+    }
+}
+
+impl Analyze for StmtIf {
+    fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
+        self.cond.analyze(summary)?;
+
+        if let Some(err) = AnalyzeExpectedCondition::analyze(&self.cond, "If conditional") {
+            summary.error(err);
+        }
+
+        AnalyzeResult::Continue(())
+    }
+}
+
+impl Generate for StmtIf {
+    fn generate(&self, _buf: &mut GenerateBuf) {
+        todo!("if statement")
     }
 }
 
@@ -240,31 +326,12 @@ impl PrettyPrint for StmtWhile {
     }
 }
 
-#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
-#[error("While loops must have comparation expression")]
-pub struct AnalyzeWhileConditionError {
-    #[label]
-    location: Span,
-}
-
 impl Analyze for StmtWhile {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
         self.cond.analyze(summary)?;
 
-        match self.cond {
-            Expr::Binary {
-                kind:
-                    ExprBinary::Eq
-                    | ExprBinary::Ne
-                    | ExprBinary::Gt
-                    | ExprBinary::Ge
-                    | ExprBinary::Lt
-                    | ExprBinary::Le,
-                ..
-            } => {}
-            _ => summary.error(AnalyzeWhileConditionError {
-                location: self.cond.span(),
-            }),
+        if let Some(err) = AnalyzeExpectedCondition::analyze(&self.cond, "While loop") {
+            summary.error(err);
         }
 
         AnalyzeResult::Continue(())
