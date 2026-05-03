@@ -86,7 +86,15 @@ impl Span {
     }
 
     pub fn location(&self, source: &str) -> LineCol {
-        <str as peg::Parse>::position_repr(source, self.start)
+        if source.len() >= self.start {
+            <str as peg::Parse>::position_repr(source, self.start)
+        } else {
+            LineCol {
+                line: self.start,
+                column: self.len,
+                offset: self.start,
+            }
+        }
     }
 }
 

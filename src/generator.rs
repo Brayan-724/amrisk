@@ -11,7 +11,6 @@ use thiserror::Error;
 pub use instructions::*;
 pub use registers::*;
 
-use crate::nodes::Ident;
 use crate::parser::Span;
 use crate::shared_store::{StoreContainer, StoresContainer};
 
@@ -24,12 +23,12 @@ pub struct AnalyzeInsNotExist {
 
 #[derive(Default, Debug)]
 pub struct GenerateCtx {
-    vars: Vec<(Ident, usize)>,
 }
 
 #[derive(Debug)]
 pub struct GenerateBuf {
     buf: Vec<Instruction>,
+    #[expect(unused)]
     ctx: GenerateCtx,
     labels: Vec<(Box<str>, usize)>,
     stack: Vec<(Box<str>, usize)>,
@@ -44,7 +43,7 @@ impl Default for GenerateBuf {
             ctx: GenerateCtx::default(),
             labels: Vec::new(),
             stack: Vec::new(),
-            result: Register::Result,
+            result: Register::Local(0),
             stores: StoresContainer::default(),
         }
     }
@@ -128,7 +127,7 @@ impl GenerateBuf {
             Register::Result => Register::Local(0),
             Register::Local(n @ 0..=5) => Register::Local(n + 1),
             Register::Local(6..) => todo!(),
-            Register::Argument(..) => Register::Result,
+            Register::Argument(..) => Register::Local(0),
             _ => unreachable!(),
         }
     }
@@ -144,7 +143,7 @@ impl GenerateBuf {
     pub fn prev_result(&mut self) -> Register {
         let prev = self.result;
         let next = match self.result {
-            Register::Result | Register::Local(0) => Register::Result,
+            Register::Result | Register::Local(0) => Register::Local(0),
             Register::Local(n @ 1..) => Register::Local(n - 1),
             _ => unreachable!(),
         };

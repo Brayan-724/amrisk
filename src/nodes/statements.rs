@@ -167,7 +167,7 @@ impl Generate for StmtLet {
         let offset = buf.push_stack(&**self.name, 4);
         self.expr.generate(buf);
         buf.push(Instruction::Sw(
-            Register::Result,
+            buf.result,
             Offset::Imm(offset as i32),
             Register::Stack,
         ));
