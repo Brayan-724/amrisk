@@ -107,6 +107,9 @@ pub enum AnalyzeError {
     RegNotFound(#[from] generator::AnalyzeRegNotFound),
     #[error(transparent)]
     #[diagnostic(transparent)]
+    UnknownAttribute(#[from] nodes::AnalyzeUnknownAttribute),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     VariableNotExistsError(#[from] nodes::AnalyzeVariableNotExistsError),
     #[error(transparent)]
     #[diagnostic(transparent)]

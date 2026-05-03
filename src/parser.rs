@@ -195,10 +195,13 @@ Punctuation {
     Arrow = "->";
     BraceO = "{";
     BraceC = "}";
+    BracketO = "[";
+    BracketC = "]";
     Colon = ":";
     Equal = "=";
     ParenO = "(";
     ParenC = ")";
+    Pound = "#";
     Semi = ";";
 }
 );

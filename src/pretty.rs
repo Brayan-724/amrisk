@@ -309,6 +309,7 @@ impl PrettyPrint for bool {
 impl<T: PrettyPrint> PrettyPrint for Vec<T> {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         if self.is_empty() {
+            f.write_str("\x1b[2mEmpty\x1b[0m\n")?;
             return Ok(());
         }
 

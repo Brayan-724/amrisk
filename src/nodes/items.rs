@@ -12,7 +12,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::{SharedStore, StoreContainer};
 
-use super::{AnalyzeFunctionNotExistsMarker, StmtLet};
+use super::{AnalyzeFunctionNotExistsMarker, Attribute, StmtLet};
 
 /// Declarations
 #[derive(Debug, Clone, Node)]
@@ -25,6 +25,7 @@ pub enum Item {
 #[derive(Debug, Clone, Node)]
 #[node()]
 pub struct ItemFunction {
+    pub attrs: Vec<Attribute>,
     pub unsafe_: Option<Spanned<Token>>,
     pub fn_: Spanned<Token>,
     pub name: Spanned<Ident>,
@@ -63,6 +64,7 @@ impl PrettyPrint for ItemFunction {
             .field("name", &self.name)?
             .field("args", &self.args)?
             .field("ret", &self.ret)?
+            .field("attrs", &self.attrs)?
             .field("unsafe", &self.unsafe_.is_some())?
             .children(&self.body.stmts)?
             .finish()
@@ -102,6 +104,8 @@ impl Analyze for ItemFunction {
         } else if summary.remove_marked::<AnalyzeFunctionNotExistsMarker>() != 0 {
             return AnalyzeResult::Break(true);
         }
+
+        self.attrs.analyze(summary)?;
 
         for arg in &self.args.args {
             summary

@@ -35,13 +35,14 @@ peg::parser!(
         rule item() -> Item = item_fn()
 
         rule item_fn() -> Item =
+            attrs:attrs() _?
             unsafe_:(unsafe_:TP(Token::Unsafe) _ { unsafe_ })?
             fn_:TP(Token::Fn) _
             name:ident() _?
             args:fn_args() _?
             ret:fn_ret()? _?
             body:block() _?
-        { Item::Function(ItemFunction { unsafe_, fn_, name, args, ret, body }) }
+        { Item::Function(ItemFunction { attrs, unsafe_, fn_, name, args, ret, body }) }
         / expected!("Function")
 
         ////////////////////
@@ -135,6 +136,24 @@ peg::parser!(
             start:position!() n:$(quiet!{ ['-']? ['0'..='9']+ })
         {? n.parse().or(Err("i32")).map(|v| Span::new(start, n.len()).of(v)) }
             / expected!("Number")
+
+        ////////////////////
+        //////////////////// ATTRIBUTES
+        ////////////////////
+
+        rule attrs() -> Vec<Attribute> = attr:attr() ** (_?) { attr }
+
+        rule attr() -> Attribute =
+            pound:TP(Token::Pound)
+            open:T(Token::BracketO) _?
+            path:ident() _?
+            style:attr_style() _?
+            close:T(Token::BracketC)
+        { Attribute { pound, open, path, style, close } }
+
+        rule attr_style() -> AttributeStyle = attr_path()
+
+        rule attr_path() -> AttributeStyle = {AttributeStyle::Path}
 
         ////////////////////
         //////////////////// UTILS

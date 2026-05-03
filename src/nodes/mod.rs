@@ -1,7 +1,9 @@
+mod attribute;
 mod expr;
 mod items;
 mod statements;
 
+pub use attribute::*;
 pub use expr::*;
 pub use items::*;
 use miette::Diagnostic;

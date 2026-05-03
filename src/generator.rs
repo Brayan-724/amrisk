@@ -22,8 +22,7 @@ pub struct AnalyzeInsNotExist {
 }
 
 #[derive(Default, Debug)]
-pub struct GenerateCtx {
-}
+pub struct GenerateCtx {}
 
 #[derive(Debug)]
 pub struct GenerateBuf {
