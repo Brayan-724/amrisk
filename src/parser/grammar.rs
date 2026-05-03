@@ -151,9 +151,10 @@ peg::parser!(
             close:T(Token::BracketC)
         { Attribute { pound, open, path, style, close } }
 
-        rule attr_style() -> AttributeStyle = attr_path()
+        rule attr_style() -> AttributeStyle = attr_expr() / attr_path()
 
         rule attr_path() -> AttributeStyle = {AttributeStyle::Path}
+        rule attr_expr() -> AttributeStyle = equal:TP(Token::Equal) _? value:expr() {AttributeStyle::Expr { equal, value }}
 
         ////////////////////
         //////////////////// UTILS

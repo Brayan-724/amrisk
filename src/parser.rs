@@ -79,6 +79,12 @@ impl Span {
         self.start + self.len
     }
 
+    /// Create a padding from the start and set area as span.
+    /// If size is larger than span it will overflows to right.
+    pub fn start_span(&self, size: usize) -> Span {
+        Span::new(self.start.saturating_sub(size), size)
+    }
+
     /// Create a padding from the end and set area as span.
     /// If size is larger than span it will overflows to right.
     pub fn end_span(&self, size: usize) -> Span {

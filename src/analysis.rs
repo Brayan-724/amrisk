@@ -77,6 +77,12 @@ pub trait Analyze {
 pub enum AnalyzeError {
     #[error(transparent)]
     #[diagnostic(transparent)]
+    AttributeUnknown(#[from] nodes::AnalyzeAttributeUnknown),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    AttributeExpectedPath(#[from] nodes::AnalyzeAttributeExpectedPath),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     CalleeIsNotIdent(#[from] nodes::AnalyzeCalleeIsNotIdent),
     #[error(transparent)]
     #[diagnostic(transparent)]
@@ -108,9 +114,6 @@ pub enum AnalyzeError {
     #[error(transparent)]
     #[diagnostic(transparent)]
     RegNotFound(#[from] generator::AnalyzeRegNotFound),
-    #[error(transparent)]
-    #[diagnostic(transparent)]
-    UnknownAttribute(#[from] nodes::AnalyzeUnknownAttribute),
     #[error(transparent)]
     #[diagnostic(transparent)]
     VariableNotExistsError(#[from] nodes::AnalyzeVariableNotExistsError),
