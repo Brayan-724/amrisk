@@ -77,6 +77,7 @@ impl<'s, 'a, 'f: 'a> PrettyFormatter<'s, 'a, 'f> {
         Ok(PrettyNode {
             buf: self,
             levels: 0,
+            has_fields: false,
         })
     }
 
@@ -170,18 +171,36 @@ impl fmt::Write for PrettyFormatter<'_, '_, '_> {
 pub struct PrettyNode<'p, 's: 'p, 'a: 'p, 'f: 'a> {
     buf: &'p mut PrettyFormatter<'s, 'a, 'f>,
     levels: usize,
+    has_fields: bool,
 }
 
 impl PrettyNode<'_, '_, '_, '_> {
     #[inline(always)]
-    pub fn begin_fields(mut self) -> Self {
-        self.buf.level += 1;
-        self.levels += 1;
+    pub fn indent(&mut self, level: isize) {
+        self.buf.level = self.buf.level.saturating_add_signed(level);
+        self.levels = self.levels.saturating_add_signed(level);
+    }
+
+    #[inline(always)]
+    pub fn begin_fields(&mut self) {
+        if !self.has_fields {
+            self.has_fields = true;
+            self.indent(1);
+        }
+    }
+
+    #[inline(always)]
+    pub fn end_fields(mut self) -> Self {
+        if self.has_fields {
+            self.has_fields = false;
+            self.indent(-1);
+        }
         self
     }
 
     #[inline(always)]
     pub fn write_field_key(mut self, name: &'static str) -> Result<Self, fmt::Error> {
+        self.begin_fields();
         self.buf.write_indent()?;
         self.write_str(name)?;
         self.write_str(": ")?;
@@ -212,28 +231,18 @@ impl PrettyNode<'_, '_, '_, '_> {
     }
 
     #[inline(always)]
-    pub fn end_fields(mut self) -> Self {
-        self.buf.level -= 1;
-        self.levels -= 1;
-        self
-    }
-
-    #[inline(always)]
     pub fn children(mut self, children: &[impl PrettyPrint]) -> Result<Self, fmt::Error> {
+        self = self.end_fields();
         self.write_children(children)?;
         Ok(self)
     }
 
     #[inline(always)]
     pub fn child(mut self, child: &impl PrettyPrint) -> Result<Self, fmt::Error> {
-        self.buf.level += 1;
-        self.levels += 1;
+        self.begin_fields();
 
         self.write_indent()?;
         child.pretty_print(&mut self)?;
-
-        self.buf.level -= 1;
-        self.levels -= 1;
 
         Ok(self)
     }

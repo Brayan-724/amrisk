@@ -56,9 +56,7 @@ impl IntoSpanned for StmtExpr {
 impl PrettyPrint for StmtExpr {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.node("Statment::Expr", self.span())?
-            .begin_fields()
             .field("has_semi", &self.semi.is_some())?
-            .end_fields()
             .child(&self.expr)?
             .finish()
     }
@@ -96,7 +94,6 @@ impl IntoSpanned for StmtLabel {
 impl PrettyPrint for StmtLabel {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.node("Statment::Label", self.span())?
-            .begin_fields()
             .field("name", &self.name)?
             .finish()
     }
@@ -144,10 +141,8 @@ impl IntoSpanned for StmtLet {
 impl PrettyPrint for StmtLet {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.node("Statment::Let", self.span())?
-            .begin_fields()
             .field("name", &self.name)?
             .field("has_semi", &self.semi.is_some())?
-            .end_fields()
             .child(&self.expr)?
             .finish()
     }
@@ -235,9 +230,7 @@ impl IntoSpanned for StmtWhile {
 impl PrettyPrint for StmtWhile {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.node("Statment::While", self.span())?
-            .begin_fields()
             .field_child("cond", &self.cond)?
-            .end_fields()
             .child(&self.body)?
             .finish()
     }

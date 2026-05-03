@@ -12,7 +12,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::{SharedStore, StoreContainer};
 
-use super::AnalyzeFunctionNotExistsMarker;
+use super::{AnalyzeFunctionNotExistsMarker, StmtLet};
 
 /// Declarations
 #[derive(Debug, Clone, Node)]
@@ -60,12 +60,10 @@ impl IntoSpanned for ItemFunction {
 impl PrettyPrint for ItemFunction {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.node("Item::Function", self.span())?
-            .begin_fields()
             .field("name", &self.name)?
             .field("args", &self.args)?
             .field("ret", &self.ret)?
             .field("unsafe", &self.unsafe_.is_some())?
-            .end_fields()
             .children(&self.body.stmts)?
             .finish()
     }
@@ -197,7 +195,6 @@ impl IntoSpanned for FnArg {
 impl PrettyPrint for FnArg {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.node("FnArg", self.span())?
-            .begin_fields()
             .field("name", &self.name)?
             .field("ty", &self.ty)?
             .finish()

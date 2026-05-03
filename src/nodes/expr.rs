@@ -71,7 +71,6 @@ impl PrettyPrint for Expr {
         match self {
             Expr::Assign(name, value) => f
                 .node("Expr::Assign", name.span)?
-                .begin_fields()
                 .field("name", name)?
                 .end_fields()
                 .child(value.as_ref())?
@@ -83,7 +82,6 @@ impl PrettyPrint for Expr {
                 .finish(),
             Expr::Binary { kind, lhs, rhs, .. } => f
                 .node("Expr::Binary", lhs.span())?
-                .begin_fields()
                 .field(
                     "kind",
                     &match kind {
@@ -102,10 +100,8 @@ impl PrettyPrint for Expr {
                 .finish(),
             Expr::Call(callee, args) => f
                 .node("Expr::Call", callee.span())?
-                .begin_fields()
                 .field_child("callee", callee.as_ref())?
                 .field("args", args)?
-                .end_fields()
                 .finish(),
             Expr::Label(v) => f.node("Expr::Label", v.span)?.child(&v.value)?.finish(),
             Expr::Number(v) => f
