@@ -89,6 +89,9 @@ pub enum AnalyzeError {
     FunctionNotExistsError(#[from] nodes::AnalyzeFunctionNotExistsError),
     #[error(transparent)]
     #[diagnostic(transparent)]
+    FunctionUniqueEntry(#[from] nodes::AnalyzeFunctionUniqueEntry),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     InsNotExist(#[from] generator::AnalyzeInsNotExist),
     #[error(transparent)]
     #[diagnostic(transparent)]

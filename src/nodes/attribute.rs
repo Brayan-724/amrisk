@@ -49,13 +49,27 @@ pub struct AnalyzeUnknownAttribute {
 
 impl Analyze for Attribute {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
-        match &**self.path {
-            "entry" => {}
-            _ => summary.error(AnalyzeUnknownAttribute {
+        if let Err(_) = AttributeBuiltin::try_from(&*self) {
+            summary.error(AnalyzeUnknownAttribute {
                 location: self.path.span(),
-            }),
+            })
         }
 
         AnalyzeResult::Continue(())
+    }
+}
+
+pub enum AttributeBuiltin {
+    Entry,
+}
+
+impl TryFrom<&Attribute> for AttributeBuiltin {
+    type Error = ();
+
+    fn try_from(value: &Attribute) -> Result<Self, Self::Error> {
+        match &**value.path {
+            "entry" => Ok(AttributeBuiltin::Entry),
+            _ => Err(()),
+        }
     }
 }

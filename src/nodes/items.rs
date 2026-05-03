@@ -12,7 +12,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::{SharedStore, StoreContainer};
 
-use super::{AnalyzeFunctionNotExistsMarker, Attribute, StmtLet};
+use super::{AnalyzeFunctionNotExistsMarker, Attribute, AttributeBuiltin, StmtLet};
 
 /// Declarations
 #[derive(Debug, Clone, Node)]
@@ -42,6 +42,7 @@ pub struct FunctionDefinition {
 
 #[derive(Default)]
 pub struct FunctionSharedStore {
+    pub entry_fn: Option<Span>,
     pub functions: HashMap<Ident, FunctionDefinition>,
 }
 
@@ -81,6 +82,16 @@ pub struct AnalyzeFunctionExistsError {
     pub original: Span,
 }
 
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("Only one entry function can exists")]
+pub struct AnalyzeFunctionUniqueEntry {
+    #[label(primary, "Second declaration")]
+    pub location: Span,
+
+    #[label("Previous declaration")]
+    pub original: Span,
+}
+
 impl Analyze for ItemFunction {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
         summary.clear_store::<StmtLet>();
@@ -106,6 +117,28 @@ impl Analyze for ItemFunction {
         }
 
         self.attrs.analyze(summary)?;
+
+        for attr in self
+            .attrs
+            .iter()
+            .map(AttributeBuiltin::try_from)
+            .filter_map(Result::ok)
+        {
+            match attr {
+                AttributeBuiltin::Entry => {
+                    if let Some(prev) = summary.shared_store::<Self>().entry_fn
+                        && prev != self.name.span
+                    {
+                        summary.error(AnalyzeFunctionUniqueEntry {
+                            location: self.name.span,
+                            original: prev,
+                        });
+                    } else {
+                        summary.shared_store::<Self>().entry_fn = Some(self.name.span);
+                    }
+                }
+            }
+        }
 
         for arg in &self.args.args {
             summary
@@ -135,7 +168,10 @@ impl Generate for ItemFunction {
         let child = self.body.generated_child(buf, buf_child);
         let child_stack = child.stack_size() as i32;
 
-        let stack_size = child_stack + 4; // Plus return pointer
+        let needs_return_pointer = buf.shared_store::<Self>().entry_fn != Some(self.name.span);
+
+        // Plus return pointer
+        let stack_size = child_stack + if needs_return_pointer { 4 } else { 0 };
 
         // Reserve required stack
         buf.push(Instruction::Addi(
@@ -144,12 +180,14 @@ impl Generate for ItemFunction {
             Imm(-stack_size),
         ));
 
-        // Save return pointer
-        buf.push(Instruction::Sw(
-            Register::Return,
-            Offset::Imm(child_stack),
-            Register::Stack,
-        ));
+        if needs_return_pointer {
+            // Save return pointer
+            buf.push(Instruction::Sw(
+                Register::Return,
+                Offset::Imm(child_stack),
+                Register::Stack,
+            ));
+        }
 
         for (idx, arg_stack) in args_stack.into_iter().enumerate() {
             buf.push(Instruction::Sw(
@@ -161,12 +199,14 @@ impl Generate for ItemFunction {
 
         buf.extend_on(child, format!(".{}.", self.name.value.0));
 
-        // Load return pointer
-        buf.push(Instruction::Lw(
-            Register::Return,
-            Offset::Imm(child_stack),
-            Register::Stack,
-        ));
+        if needs_return_pointer {
+            // Load return pointer
+            buf.push(Instruction::Lw(
+                Register::Return,
+                Offset::Imm(child_stack),
+                Register::Stack,
+            ));
+        }
 
         // Free used stack
         buf.push(Instruction::Addi(
@@ -175,7 +215,11 @@ impl Generate for ItemFunction {
             Imm(stack_size),
         ));
 
-        buf.push(Instruction::Ret());
+        if needs_return_pointer {
+            buf.push(Instruction::Ret());
+        } else {
+            buf.push(Instruction::Ebreak());
+        }
     }
 }
 
