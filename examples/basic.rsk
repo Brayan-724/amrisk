@@ -53,7 +53,9 @@ fn main() {
   let a = 1;
   let b = 2;
 
-  add(a, b);
+  let c = add(a, b);
+
+  let d = add(c, c)
 
   // print_int(a)
   // let a = 1;

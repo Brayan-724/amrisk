@@ -70,6 +70,10 @@ impl Analyze for StmtExpr {
 
 impl Generate for StmtExpr {
     fn generate(&self, buf: &mut GenerateBuf) {
+        if self.semi.is_none() {
+            buf.result = Register::Result;
+        }
+
         self.expr.generate(buf);
     }
 }

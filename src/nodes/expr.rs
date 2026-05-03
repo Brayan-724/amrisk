@@ -355,6 +355,7 @@ impl Generate for Expr {
                     buf.result = Register::Argument(idx as u8);
                     expr.generate(buf);
                 }
+                buf.result = Register::Result;
 
                 buf.push(Instruction::Call(Offset::Label(func)));
             }
