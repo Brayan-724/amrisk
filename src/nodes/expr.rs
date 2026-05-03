@@ -121,11 +121,17 @@ impl PrettyPrint for RefCell<Expr> {
 #[derive(Default)]
 pub struct ExprAnalyzeStore {
     binary_cost: usize,
-    in_callee: bool,
 }
 
 impl SharedStore<AnalyzeSummary> for Expr {
     type Store = ExprAnalyzeStore;
+}
+
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("Callee should be a function name")]
+pub struct AnalyzeCalleeIsNotIdent {
+    #[label]
+    pub location: Span,
 }
 
 #[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
@@ -217,46 +223,38 @@ impl Analyze for Expr {
                 }
             }
             Expr::Call(callee, exprs) => {
-                {
-                    let Expr::Ident(i) = &*callee.borrow() else {
-                        todo!("Expr is not ident")
-                    };
+                let Expr::Ident(i) = &*callee.borrow() else {
+                    summary.error(AnalyzeCalleeIsNotIdent {
+                        location: callee.span(),
+                    });
+                    return AnalyzeResult::Continue(());
+                };
 
-                    let Some(func) = summary.shared_store::<ItemFunction>().functions.get(i) else {
-                        summary.error_marked::<AnalyzeFunctionNotExistsMarker>(
-                            AnalyzeFunctionNotExistsError { location: i.span() },
-                        );
-                        return AnalyzeResult::Continue(());
-                    };
+                let Some(func) = summary.shared_store::<ItemFunction>().functions.get(i) else {
+                    summary.error_marked::<AnalyzeFunctionNotExistsMarker>(
+                        AnalyzeFunctionNotExistsError { location: i.span() },
+                    );
+                    return AnalyzeResult::Continue(());
+                };
 
-                    let args = &func.args;
+                let args = &func.args;
 
-                    if args.args.len() != exprs.len() {
-                        let original = args.span();
-                        let expected = args.args.len();
+                if args.args.len() != exprs.len() {
+                    let original = args.span();
+                    let expected = args.args.len();
 
-                        summary.error(AnalyzeFunctionMismatchArgsCountError {
-                            location: exprs.span(),
-                            provided: exprs.len(),
-                            original,
-                            expected,
-                        });
-
-                        return AnalyzeResult::Continue(());
-                    }
+                    summary.error(AnalyzeFunctionMismatchArgsCountError {
+                        location: exprs.span(),
+                        provided: exprs.len(),
+                        original,
+                        expected,
+                    });
                 }
-
-                let prev_in_callee = summary.store::<Expr>().in_callee;
-                summary.store::<Expr>().in_callee = true;
-                callee.analyze(summary)?;
-                summary.store::<Expr>().in_callee = prev_in_callee;
 
                 exprs.analyze(summary)?;
             }
             Expr::Ident(var) => {
-                if !summary.store::<StmtLet>().local_vars.contains_key(&var.0)
-                    && !summary.store::<Expr>().in_callee
-                {
+                if !summary.store::<StmtLet>().local_vars.contains_key(&var.0) {
                     summary.error(AnalyzeVariableNotExistsError {
                         location: var.span(),
                     });
@@ -343,7 +341,7 @@ impl Generate for Expr {
             },
             Expr::Call(expr, exprs) => {
                 let Expr::Ident(name) = &*expr.borrow() else {
-                    unreachable!("[analyzer] Call expr filters ident callee ")
+                    unreachable!("[analyzer] Call expr filters ident callee")
                 };
                 let name = &**name;
 

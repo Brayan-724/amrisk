@@ -77,6 +77,9 @@ pub trait Analyze {
 pub enum AnalyzeError {
     #[error(transparent)]
     #[diagnostic(transparent)]
+    CalleeIsNotIdent(#[from] nodes::AnalyzeCalleeIsNotIdent),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     FunctionExistsError(#[from] nodes::AnalyzeFunctionExistsError),
     #[error(transparent)]
     #[diagnostic(transparent)]
