@@ -31,9 +31,14 @@ impl AnalyzeSummary {
         self.errors.insert((error.into(), TypeId::of::<M>()));
     }
 
-    pub fn remove_marked<M: 'static + Sized>(&mut self) {
+    // Return the number of removed errors
+    pub fn remove_marked<M: 'static + Sized>(&mut self) -> usize {
+        let len = self.errors.len();
+
         self.errors
-            .retain(|(_, marker)| *marker != TypeId::of::<M>())
+            .retain(|(_, marker)| *marker != TypeId::of::<M>());
+
+        len - self.errors.len()
     }
 
     pub fn has_errors(&self) -> bool {

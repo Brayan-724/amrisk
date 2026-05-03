@@ -101,8 +101,7 @@ impl Analyze for ItemFunction {
 
                 return AnalyzeResult::Break(false);
             }
-        } else {
-            summary.remove_marked::<AnalyzeFunctionNotExistsMarker>();
+        } else if summary.remove_marked::<AnalyzeFunctionNotExistsMarker>() != 0 {
             return AnalyzeResult::Break(true);
         }
 
