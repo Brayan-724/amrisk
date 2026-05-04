@@ -13,6 +13,8 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::SharedStore;
 
+use super::generate_binary;
+
 #[derive(Debug, Clone, Node)]
 #[node(analyzer, generator, pretty, spanned)]
 pub enum Statement {
@@ -121,6 +123,15 @@ pub struct StmtIf {
     pub otherwise: Option<(Spanned<Token>, Block)>,
 }
 
+#[derive(Default)]
+pub struct StmtIfStore {
+    pub count: usize,
+}
+
+impl SharedStore<GenerateBuf> for StmtIf {
+    type Store = StmtIfStore;
+}
+
 impl IntoSpanned for StmtIf {
     fn span(&self) -> Span {
         if let Some(otherwise) = &self.otherwise {
@@ -154,13 +165,54 @@ impl Analyze for StmtIf {
             summary.error(err);
         }
 
+        self.body.analyze(summary)?;
+
+        if let Some((_, otherwise)) = &mut self.otherwise {
+            otherwise.analyze(summary)?;
+        }
+
         AnalyzeResult::Continue(())
     }
 }
 
 impl Generate for StmtIf {
-    fn generate(&self, _buf: &mut GenerateBuf) {
-        todo!("if statement")
+    fn generate(&self, buf: &mut GenerateBuf) {
+        let id = Self::store(buf).count;
+        Self::store(buf).count += 1;
+
+        let label_end: Rc<str> = Rc::from(format!("if.end.{id}").as_str());
+        let label_otherwise: Rc<str> = Rc::from(format!("if.otherwise.{id}").as_str());
+
+        match &self.cond {
+            Expr::Binary {
+                kind: ExprBinary::Eq,
+                lhs,
+                rhs,
+                swap_load,
+            } => {
+                let (a, b) = generate_binary(buf, &*lhs.borrow(), &*rhs.borrow(), *swap_load);
+                buf.push(Instruction::Bne(a, b, Offset::Label(label_otherwise.clone())));
+            }
+            Expr::Binary {
+                kind:
+                    ExprBinary::Ne | ExprBinary::Gt | ExprBinary::Ge | ExprBinary::Lt | ExprBinary::Le,
+                ..
+            } => {}
+            _ => unreachable!("Discarded by analyzer"),
+        }
+
+        self.body.generate(buf);
+
+        if let Some(otherwise) = &self.otherwise {
+            buf.push(Instruction::J(Offset::Label(label_end.clone())));
+
+            buf.label_here(&*label_otherwise);
+            otherwise.1.generate(buf);
+
+            buf.label_here(&*label_end);
+        } else {
+            buf.label_here(&*label_otherwise);
+        }
     }
 }
 

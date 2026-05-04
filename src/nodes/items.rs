@@ -12,7 +12,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::{SharedStore, StoreContainer};
 
-use super::{AnalyzeFunctionNotExistsMarker, Attribute, AttributeBuiltin, StmtLet};
+use super::{AnalyzeFunctionNotExistsMarker, Attribute, AttributeBuiltin, StmtIf, StmtLet};
 
 /// Declarations
 #[derive(Debug, Clone, Node)]
@@ -155,6 +155,8 @@ impl Analyze for ItemFunction {
 impl Generate for ItemFunction {
     fn generate(&self, buf: &mut GenerateBuf) {
         buf.label_here(&**self.name);
+
+        buf.clear_store::<StmtIf>();
 
         let mut buf_child = GenerateBuf::default();
 

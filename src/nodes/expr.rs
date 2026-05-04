@@ -369,7 +369,7 @@ impl Generate for Expr {
     }
 }
 
-fn generate_binary(
+pub fn generate_binary(
     buf: &mut GenerateBuf,
     lhs: &Expr,
     rhs: &Expr,

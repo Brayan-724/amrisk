@@ -54,11 +54,10 @@ fn main() {
   let a = 1;
 
   if a == 1 {
-      let c = add(a, b);
+      let c = add(a, 2);
+  } else {
+      let c = add(a, 3);
   }
-  // else {
-  //     let c = add(a, b);
-  // }
 }
 
 fn add(a: int, b: int) { 
