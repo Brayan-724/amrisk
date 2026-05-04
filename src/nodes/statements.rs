@@ -371,20 +371,35 @@ impl Generate for StmtLoop {
 
 #[derive(Debug, Clone)]
 pub struct StmtWhile {
+    pub do_: Option<Spanned<Token>>,
     pub while_: Spanned<Token>,
     pub cond: Expr,
     pub body: Block,
 }
 
+#[derive(Default)]
+pub struct StmtWhileStore {
+    pub count: usize,
+}
+
+impl SharedStore<GenerateBuf> for StmtWhile {
+    type Store = StmtWhileStore;
+}
+
 impl IntoSpanned for StmtWhile {
     fn span(&self) -> Span {
-        self.while_.span.merge(self.body.span())
+        if let Some(do_) = &self.do_ {
+            do_.span.merge(self.body.span())
+        } else {
+            self.while_.span.merge(self.body.span())
+        }
     }
 }
 
 impl PrettyPrint for StmtWhile {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         f.node("Statment::While", self.span())?
+            .field("is_do", &self.do_.is_some())?
             .field_child("cond", &self.cond)?
             .child(&self.body)?
             .finish()
@@ -399,12 +414,47 @@ impl Analyze for StmtWhile {
             summary.error(err);
         }
 
-        AnalyzeResult::Continue(())
+        self.body.analyze(summary)
     }
 }
 
 impl Generate for StmtWhile {
-    fn generate(&self, _buf: &mut GenerateBuf) {
-        todo!("while statement")
+    fn generate(&self, buf: &mut GenerateBuf) {
+        let id = Self::store(buf).count;
+        Self::store(buf).count += 1;
+
+        let label_begin: Rc<str> = Rc::from(format!("while.begin.{id}").as_str());
+
+        buf.label_here(&*label_begin);
+
+        if self.do_.is_some() {
+            self.body.generate(buf);
+
+            match_cond!(buf, &self.cond, label_begin.clone(),
+                Eq => Beq,
+                Ne => Bne,
+                Gt => Bgt,
+                Ge => Bge,
+                Lt => Blt,
+                Le => Ble,
+            );
+        } else {
+            let label_end: Rc<str> = Rc::from(format!("while.end.{id}").as_str());
+
+            match_cond!(buf, &self.cond, label_end.clone(),
+                Eq => Bne,
+                Ne => Beq,
+                Gt => Ble,
+                Ge => Blt,
+                Lt => Bge,
+                Le => Bgt,
+            );
+
+            self.body.generate(buf);
+
+            buf.push(Instruction::J(Offset::Label(label_begin)));
+
+            buf.label_here(&*label_end);
+        }
     }
 }

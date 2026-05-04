@@ -189,6 +189,7 @@ macro_rules! def_tokens {
 
 def_tokens! (
 Keywords {
+    Do = "do";
     Else = "else";
     Fn = "fn";
     If = "if";

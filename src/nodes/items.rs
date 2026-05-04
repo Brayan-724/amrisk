@@ -12,7 +12,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::{SharedStore, StoreContainer};
 
-use super::{AnalyzeFunctionNotExistsMarker, Attribute, AttributeBuiltin, StmtIf, StmtLet};
+use super::{AnalyzeFunctionNotExistsMarker, Attribute, AttributeBuiltin, statements};
 
 /// Declarations
 #[derive(Debug, Clone, Node)]
@@ -94,7 +94,7 @@ pub struct AnalyzeFunctionUniqueEntry {
 
 impl Analyze for ItemFunction {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
-        summary.clear_store::<StmtLet>();
+        summary.clear_store::<statements::StmtLet>();
 
         if let Some(previous) = summary.shared_store::<Self>().functions.insert(
             (&*self.name).clone(),
@@ -142,7 +142,7 @@ impl Analyze for ItemFunction {
 
         for arg in &self.args.args {
             summary
-                .store::<StmtLet>()
+                .store::<statements::StmtLet>()
                 .local_vars
                 .entry(arg.name.0.clone())
                 .insert_entry(arg.name.span());
@@ -156,7 +156,8 @@ impl Generate for ItemFunction {
     fn generate(&self, buf: &mut GenerateBuf) {
         buf.label_here(&**self.name);
 
-        buf.clear_store::<StmtIf>();
+        buf.clear_store::<statements::StmtIf>();
+        buf.clear_store::<statements::StmtWhile>();
 
         let mut buf_child = GenerateBuf::default();
 

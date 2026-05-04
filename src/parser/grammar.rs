@@ -65,7 +65,15 @@ peg::parser!(
         //////////////////// STATEMENTS
         ////////////////////
 
-        rule stmt() -> Statement = stmt_if() / stmt_let() / stmt_loop() / stmt_while() / stmt_label() / stmt_expr()
+        rule stmt() -> Statement =  stmt_do_while() / stmt_if() / stmt_let() / stmt_loop() / stmt_while() / stmt_label() / stmt_expr()
+
+        rule stmt_do_while() -> Statement =
+            do_:T(Token::Do) _?
+            body:block() _?
+            while_:T(Token::While) _?
+            cond:expr() _?
+            semi:T(Token::Semi) _?
+        { Statement::While(StmtWhile { do_: Some(do_), while_, cond, body }) }
 
         rule stmt_expr() -> Statement =
             e:block() _?
@@ -107,7 +115,7 @@ peg::parser!(
             while_:T(Token::While) _?
             cond:expr() _?
             body:block() _?
-        { Statement::While(StmtWhile { while_, cond, body }) }
+        { Statement::While(StmtWhile { do_: None, while_, cond, body }) }
 
         ////////////////////
         //////////////////// EXPRESSION
