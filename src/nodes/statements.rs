@@ -15,6 +15,28 @@ use crate::shared_store::SharedStore;
 
 use super::generate_binary;
 
+macro_rules! match_cond {
+    ($buf:expr, $cond:expr, $label:expr,
+     $($kind:ident => $ins:ident),+ $(,)?
+    ) => {
+        match $cond {
+            $(
+            Expr::Binary {
+                kind: ExprBinary::$kind,
+                lhs,
+                rhs,
+                swap_load,
+            } => {
+                let (a, b) = generate_binary($buf, &*lhs.borrow(), &*rhs.borrow(), *swap_load);
+                $buf.push(Instruction::$ins(a, b, Offset::Label($label)));
+            }
+            )*
+            _ => unreachable!("Discarded by analyzer"),
+
+        }
+    };
+}
+
 #[derive(Debug, Clone, Node)]
 #[node(analyzer, generator, pretty, spanned)]
 pub enum Statement {
@@ -183,27 +205,7 @@ impl Generate for StmtIf {
         let label_end: Rc<str> = Rc::from(format!("if.end.{id}").as_str());
         let label_otherwise: Rc<str> = Rc::from(format!("if.otherwise.{id}").as_str());
 
-        macro_rules! match_cond {
-            ($($kind:ident => $ins:ident),+ $(,)?) => {
-                match &self.cond {
-                    $(
-                    Expr::Binary {
-                        kind: ExprBinary::$kind,
-                        lhs,
-                        rhs,
-                        swap_load,
-                    } => {
-                        let (a, b) = generate_binary(buf, &*lhs.borrow(), &*rhs.borrow(), *swap_load);
-                        buf.push(Instruction::$ins(a, b, Offset::Label(label_otherwise.clone())));
-                    }
-                    )*
-                    _ => unreachable!("Discarded by analyzer"),
-
-                }
-            };
-        }
-
-        match_cond!(
+        match_cond!(buf, &self.cond, label_otherwise.clone(),
             Eq => Bne,
             Ne => Beq,
             Gt => Ble,
