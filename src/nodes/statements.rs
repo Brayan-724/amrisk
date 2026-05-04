@@ -183,23 +183,34 @@ impl Generate for StmtIf {
         let label_end: Rc<str> = Rc::from(format!("if.end.{id}").as_str());
         let label_otherwise: Rc<str> = Rc::from(format!("if.otherwise.{id}").as_str());
 
-        match &self.cond {
-            Expr::Binary {
-                kind: ExprBinary::Eq,
-                lhs,
-                rhs,
-                swap_load,
-            } => {
-                let (a, b) = generate_binary(buf, &*lhs.borrow(), &*rhs.borrow(), *swap_load);
-                buf.push(Instruction::Bne(a, b, Offset::Label(label_otherwise.clone())));
-            }
-            Expr::Binary {
-                kind:
-                    ExprBinary::Ne | ExprBinary::Gt | ExprBinary::Ge | ExprBinary::Lt | ExprBinary::Le,
-                ..
-            } => {}
-            _ => unreachable!("Discarded by analyzer"),
+        macro_rules! match_cond {
+            ($($kind:ident => $ins:ident),+ $(,)?) => {
+                match &self.cond {
+                    $(
+                    Expr::Binary {
+                        kind: ExprBinary::$kind,
+                        lhs,
+                        rhs,
+                        swap_load,
+                    } => {
+                        let (a, b) = generate_binary(buf, &*lhs.borrow(), &*rhs.borrow(), *swap_load);
+                        buf.push(Instruction::$ins(a, b, Offset::Label(label_otherwise.clone())));
+                    }
+                    )*
+                    _ => unreachable!("Discarded by analyzer"),
+
+                }
+            };
         }
+
+        match_cond!(
+            Eq => Bne,
+            Ne => Beq,
+            Gt => Ble,
+            Ge => Blt,
+            Lt => Bge,
+            Le => Bgt,
+        );
 
         self.body.generate(buf);
 

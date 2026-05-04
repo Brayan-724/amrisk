@@ -53,15 +53,9 @@
 fn main() {
   let a = 1;
 
-  if a == 1 {
-      let c = add(a, 2);
-  } else {
-      let c = add(a, 3);
+  if a > 1 {
+      let b = 1 + 2;
   }
-}
-
-fn add(a: int, b: int) { 
-  a + b
 }
 
 // vim: set ft=rust:
