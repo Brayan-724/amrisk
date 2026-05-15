@@ -162,7 +162,7 @@ impl fmt::Display for GenerateBuf {
         let mut next_label = labels.next();
 
         for (idx, ins) in self.buf.iter().enumerate() {
-            if let Some(label) = next_label
+            while let Some(label) = next_label
                 && label.1 == idx
             {
                 if f.alternate() {
