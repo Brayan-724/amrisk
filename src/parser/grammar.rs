@@ -122,7 +122,7 @@ peg::parser!(
         ////////////////////
 
         rule expr() -> Expr = precedence!{
-            name:ident() _? "=" _? y:@ { Expr::Assign(name, Box::from(RefCell::new(y))) }
+            name:(@) _? "=" _? y:@ { Expr::Assign(RefCell::new(name).into(), Box::from(RefCell::new(y))) }
             --
             x:(@) _? "==" _? y:@ { Expr::Binary { kind: ExprBinary::Eq, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
             x:(@) _? "!=" _? y:@ { Expr::Binary { kind: ExprBinary::Ne, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
@@ -132,6 +132,7 @@ peg::parser!(
             x:(@) _? ">"  _? y:@ { Expr::Binary { kind: ExprBinary::Gt, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
             --
             c:expr_stom() _? "(" args:expr() ** (_? "," _?) ")" { Expr::Call(RefCell::new(c).into(), args) }
+            size:expr_deref() _ e:@ { Expr::Deref(size, RefCell::new(e).into()) }
             --
             x:(@) _? "+"  _? y:@ { Expr::Binary { kind: ExprBinary::Add, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
             x:(@) _? "-"  _? y:@ { Expr::Binary { kind: ExprBinary::Sub, lhs: RefCell::new(x).into(), rhs: RefCell::new(y).into(), swap_load: false } }
@@ -139,6 +140,10 @@ peg::parser!(
             e:expr_stom() { e }
         }
         / expected!("Expression")
+
+        rule expr_deref() -> Spanned<ExprDeref> =
+            start:position!() "*" size:("b" {ExprDeref::Byte} / "h" {ExprDeref::Half} / "w" {ExprDeref::Word})
+        { Span::new(start, 2).of(size) }
 
         rule expr_stom() -> Expr =
             n:number() { Expr::Number(n) }
@@ -202,7 +207,7 @@ mod token {
             len: token.len(),
         };
 
-        if input.get(pos..span.end()).is_none_or(|peek| peek != token) {
+        if span.get(input).is_none_or(|peek| peek != token) {
             return Err(token);
         }
 

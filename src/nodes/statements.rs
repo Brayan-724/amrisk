@@ -13,7 +13,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::SharedStore;
 
-use super::generate_binary;
+use super::{ExprDeref, generate_binary};
 
 macro_rules! match_cond {
     ($buf:expr, $cond:expr, $label:expr,
@@ -320,7 +320,7 @@ impl Analyze for StmtLet {
 impl Generate for StmtLet {
     fn generate(&self, buf: &mut GenerateBuf) {
         self.expr.generate(buf);
-        let offset = buf.push_stack(&**self.name, 4);
+        let offset = buf.push_stack(&**self.name, ExprDeref::Word);
         buf.push(Instruction::Sw(
             buf.result,
             Offset::Imm(offset as i32),

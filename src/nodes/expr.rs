@@ -17,8 +17,7 @@ use super::StmtLet;
 #[derive(Debug, Clone, Node)]
 #[node()]
 pub enum Expr {
-    Assign(Spanned<Ident>, Box<RefCell<Expr>>),
-    Ident(Spanned<Ident>),
+    Assign(Box<RefCell<Expr>>, Box<RefCell<Expr>>),
     Block(Block),
     #[spanned(lhs, rhs)]
     Binary {
@@ -28,6 +27,8 @@ pub enum Expr {
         swap_load: bool,
     },
     Call(Box<RefCell<Expr>>, Vec<Expr>),
+    Deref(Spanned<ExprDeref>, Box<RefCell<Expr>>),
+    Ident(Spanned<Ident>),
     Label(Spanned<Ident>),
     Number(Spanned<i32>),
 }
@@ -36,10 +37,11 @@ impl IntoSpanned for Expr {
     fn span(&self) -> Span {
         match self {
             Expr::Assign(name, value) => name.span().merge(value.span()),
-            Expr::Ident(v) => v.span,
             Expr::Block(v) => v.span(),
             Expr::Binary { lhs, rhs, .. } => lhs.span().merge(rhs.span()),
             Expr::Call(callee, args) => callee.span().merge(args.span()),
+            Expr::Deref(deref, v) => deref.span.merge(v.span()),
+            Expr::Ident(v) => v.span,
             Expr::Label(v) => v.span,
             Expr::Number(v) => v.span,
         }
@@ -66,16 +68,23 @@ pub enum ExprBinary {
     Le,
 }
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum ExprDeref {
+    Byte = 1,
+    Half = 2,
+    Word = 4,
+}
+
 impl PrettyPrint for Expr {
     fn pretty_print(&self, f: &mut PrettyFormatter) -> fmt::Result {
         match self {
             Expr::Assign(name, value) => f
-                .node("Expr::Assign", name.span)?
-                .field("name", name)?
+                .node("Expr::Assign", name.span())?
+                .field_child("name", name.as_ref())?
                 .end_fields()
                 .child(value.as_ref())?
                 .finish(),
-            Expr::Ident(v) => f.node("Expr::Ident", v.span)?.child(&v.value)?.finish(),
             Expr::Block(v) => f
                 .node("Expr::Block", v.span())?
                 .children(&v.stmts)?
@@ -103,6 +112,19 @@ impl PrettyPrint for Expr {
                 .field_child("callee", callee.as_ref())?
                 .field("args", args)?
                 .finish(),
+            Expr::Deref(deref, expr) => f
+                .node("Expr::Deref", expr.span())?
+                .field(
+                    "kind",
+                    &match &**deref {
+                        ExprDeref::Byte => "Byte",
+                        ExprDeref::Half => "Half",
+                        ExprDeref::Word => "Word",
+                    },
+                )?
+                .child(expr.as_ref())?
+                .finish(),
+            Expr::Ident(v) => f.node("Expr::Ident", v.span)?.child(&v.value)?.finish(),
             Expr::Label(v) => f.node("Expr::Label", v.span)?.child(&v.value)?.finish(),
             Expr::Number(v) => f
                 .node("Expr::Number", v.span)?
@@ -125,6 +147,14 @@ pub struct ExprAnalyzeStore {
 
 impl SharedStore<AnalyzeSummary> for Expr {
     type Store = ExprAnalyzeStore;
+}
+
+#[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
+#[error("Expr is not assignable")]
+#[diagnostic(help("try deref it: *b, *h, *w"))]
+pub struct AnalyzeExprNotAssignable {
+    #[label]
+    pub location: Span,
 }
 
 #[derive(Hash, Debug, Error, Diagnostic, PartialEq, Eq)]
@@ -167,10 +197,15 @@ impl Analyze for Expr {
     fn analyze(&mut self, summary: &mut AnalyzeSummary) -> AnalyzeResult {
         match self {
             Expr::Assign(var, expr) => {
-                if !summary.store::<StmtLet>().local_vars.contains_key(&var.0) {
-                    summary.error(AnalyzeVariableNotExistsError {
-                        location: var.span(),
-                    });
+                var.analyze(summary)?;
+
+                match &*var.borrow() {
+                    Self::Deref(..) | Self::Ident(..) => {}
+                    _ => {
+                        summary.error(AnalyzeExprNotAssignable {
+                            location: var.span(),
+                        });
+                    }
                 }
 
                 expr.analyze(summary)?;
@@ -253,6 +288,9 @@ impl Analyze for Expr {
 
                 exprs.analyze(summary)?;
             }
+            Expr::Deref(_, expr) => {
+                expr.analyze(summary)?;
+            }
             Expr::Ident(var) => {
                 if !summary.store::<StmtLet>().local_vars.contains_key(&var.0) {
                     summary.error(AnalyzeVariableNotExistsError {
@@ -277,32 +315,42 @@ impl Generate for Expr {
     fn generate(&self, buf: &mut GenerateBuf) {
         match self {
             Expr::Assign(var, expr) => {
-                let (offset, _) = buf
-                    .get_stack(var.0.as_ref())
-                    .expect("Analyzer must ensure variable exists");
+                let (size, res, offset) = match &*var.borrow() {
+                    Expr::Ident(var) => {
+                        let (offset, size) = buf
+                            .get_stack(var.0.as_ref())
+                            .expect("Analyzer must ensure variable exists");
 
-                expr.borrow().generate(buf);
+                        expr.borrow().generate(buf);
 
-                buf.push(Instruction::Sw(
-                    buf.result,
-                    Offset::Imm(offset as i32),
-                    Register::Stack,
-                ));
-            }
-            Expr::Ident(var) => {
-                let (offset, size) = buf
-                    .get_stack(var.0.as_ref())
-                    .expect("Analyzer must ensure variable exists");
+                        (size, buf.result, Offset::Imm(offset as i32))
+                    }
+                    Expr::Deref(size, value) => {
+                        value.borrow().generate(buf);
 
-                let offset = Offset::Imm(offset as i32);
-                let inst = match size {
-                    1 => Instruction::Lb(buf.result, offset, Register::Stack),
-                    2 => Instruction::Lh(buf.result, offset, Register::Stack),
-                    4 => Instruction::Lw(buf.result, offset, Register::Stack),
-                    _ => todo!(),
+                        let reg = buf.result;
+
+                        buf.next_result();
+
+                        expr.borrow().generate(buf);
+
+                        let res = buf.prev_result();
+                        let offset = Offset::Relative(0, reg);
+
+                        (size.value, res, offset)
+                    }
+                    _ => {
+                        unreachable!("Analyzer must ensure variants")
+                    }
                 };
 
-                buf.push(inst);
+                let ins = match size {
+                    ExprDeref::Byte => Instruction::Sb(res, offset, Register::Stack),
+                    ExprDeref::Half => Instruction::Sh(res, offset, Register::Stack),
+                    ExprDeref::Word => Instruction::Sw(res, offset, Register::Stack),
+                };
+
+                buf.push(ins);
             }
             Expr::Block(_block) => todo!("block expression"),
             Expr::Binary {
@@ -358,6 +406,32 @@ impl Generate for Expr {
                 buf.result = Register::Result;
 
                 buf.push(Instruction::Call(Offset::Label(func)));
+            }
+            Expr::Deref(size, expr) => {
+                expr.borrow().generate(buf);
+
+                let offset = Offset::Relative(0, buf.result);
+                let inst = match size.value {
+                    ExprDeref::Byte => Instruction::Lb(buf.result, offset, Register::Stack),
+                    ExprDeref::Half => Instruction::Lh(buf.result, offset, Register::Stack),
+                    ExprDeref::Word => Instruction::Lw(buf.result, offset, Register::Stack),
+                };
+
+                buf.push(inst);
+            }
+            Expr::Ident(var) => {
+                let (offset, size) = buf
+                    .get_stack(var.0.as_ref())
+                    .expect("Analyzer must ensure variable exists");
+
+                let offset = Offset::Imm(offset as i32);
+                let inst = match size {
+                    ExprDeref::Byte => Instruction::Lb(buf.result, offset, Register::Stack),
+                    ExprDeref::Half => Instruction::Lh(buf.result, offset, Register::Stack),
+                    ExprDeref::Word => Instruction::Lw(buf.result, offset, Register::Stack),
+                };
+
+                buf.push(inst);
             }
             Expr::Label(l) => {
                 buf.label_here(&*l.value);

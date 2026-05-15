@@ -102,6 +102,10 @@ impl Span {
             }
         }
     }
+
+    pub fn get(self, s: &str) -> Option<&str> {
+        s.get(self.start..self.end())
+    }
 }
 
 impl From<Span> for SourceSpan {

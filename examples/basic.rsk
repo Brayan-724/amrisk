@@ -27,35 +27,33 @@
 // }
 
 // SAFE VERSION
-// fn memcopy(src: word, dst: word, size: half) {
-//   let end = src + dst;
-// 
-//   while (end - src > 4) {
-//     let buf = *w src;
-//     *w dst = buf;
-// 
-//     src = src + 4;
-//     dst = dst + 4;
-//   }
-// 
-//   while (src != end) {
-//     let buf = *b src;
-//     *b dst = buf;
-// 
-//     src = src + 1;
-//     dst = dst + 1;
-//   }
-// 
-//   dst
-// }
+fn memcopy(src: word, dst: word, size: half) {
+  let end = src + dst;
+
+  while (end - src > 4) {
+    *w dst = *w src;
+
+    src = src + 4;
+    dst = dst + 4;
+  }
+
+  while (src != end) {
+    *b dst = *b src;
+
+    src = src + 1;
+    dst = dst + 1;
+  }
+
+  dst
+}
 
 #[entry]
 fn main() {
   let a = 1;
 
-  do {
-      a = a + 1;
-  } while a < 5;
+  // do {
+  //     a = a + 1;
+  // } while a < 5;
 }
 
 // vim: set ft=rust:

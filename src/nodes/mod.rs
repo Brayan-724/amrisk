@@ -100,7 +100,7 @@ impl Analyze for Block {
             .iter()
             .rev()
             .skip(1)
-            .find(|s| s.has_semi().is_none_or(|t| !t))
+            .find(|s| s.has_semi().is_some_and(|t| !t))
         {
             summary.error(AnalyzeMissingSemicolon {
                 location: s.span().end_span(0),

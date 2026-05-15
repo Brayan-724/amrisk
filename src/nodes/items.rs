@@ -12,7 +12,7 @@ use crate::parser::{IntoSpanned, Span, Spanned, Token};
 use crate::pretty::{PrettyFormatter, PrettyPrint};
 use crate::shared_store::{SharedStore, StoreContainer};
 
-use super::{AnalyzeFunctionNotExistsMarker, Attribute, AttributeBuiltin, statements};
+use super::{AnalyzeFunctionNotExistsMarker, Attribute, AttributeBuiltin, ExprDeref, statements};
 
 /// Declarations
 #[derive(Debug, Clone, Node)]
@@ -165,7 +165,7 @@ impl Generate for ItemFunction {
             .args
             .args
             .iter()
-            .map(|arg| buf_child.push_stack(&*arg.name.0, 4))
+            .map(|arg| buf_child.push_stack(&*arg.name.0, ExprDeref::Word))
             .collect::<Vec<_>>();
 
         let child = self.body.generated_child(buf, buf_child);

@@ -11,6 +11,7 @@ use thiserror::Error;
 pub use instructions::*;
 pub use registers::*;
 
+use crate::nodes::ExprDeref;
 use crate::parser::Span;
 use crate::shared_store::{StoreContainer, StoresContainer};
 
@@ -30,7 +31,7 @@ pub struct GenerateBuf {
     #[expect(unused)]
     ctx: GenerateCtx,
     labels: Vec<(Box<str>, usize)>,
-    stack: Vec<(Box<str>, usize)>,
+    stack: Vec<(Box<str>, ExprDeref)>,
     pub result: Register,
     stores: StoresContainer,
 }
@@ -72,10 +73,10 @@ impl GenerateBuf {
     }
 
     pub fn stack_size(&self) -> usize {
-        self.stack.iter().fold(0, |offset, c| offset + c.1)
+        self.stack.iter().fold(0, |offset, c| offset + c.1 as usize)
     }
 
-    pub fn push_stack(&mut self, name: impl Into<Box<str>>, size: usize) -> usize {
+    pub fn push_stack(&mut self, name: impl Into<Box<str>>, size: ExprDeref) -> usize {
         let offset = self.stack_size();
 
         self.stack.push((name.into(), size));
@@ -108,19 +109,19 @@ impl GenerateBuf {
         }
     }
 
-    pub fn get_stack(&self, name: &str) -> Option<(usize, usize)> {
+    pub fn get_stack(&self, name: &str) -> Option<(usize, ExprDeref)> {
         self.stack
             .iter()
             .rev()
-            .try_fold(0, |offset, (var, size)| {
+            .try_fold(0usize, |offset, (var, size)| {
                 if &**var == name {
                     ControlFlow::Break((offset, *size))
                 } else {
-                    ControlFlow::Continue(offset + size)
+                    ControlFlow::Continue(offset + *size as usize)
                 }
             })
             .break_value()
-            .map(|(rev_offset, size)| (self.stack_size() - rev_offset - size, size))
+            .map(|(rev_offset, size)| (self.stack_size() - rev_offset - size as usize, size))
     }
 
     pub fn next_result_peek(&self) -> Register {

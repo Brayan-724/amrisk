@@ -89,6 +89,9 @@ pub enum AnalyzeError {
     ExpectedCondition(#[from] nodes::AnalyzeExpectedCondition),
     #[error(transparent)]
     #[diagnostic(transparent)]
+    ExprNotAssignable(#[from] nodes::AnalyzeExprNotAssignable),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     FunctionExistsError(#[from] nodes::AnalyzeFunctionExistsError),
     #[error(transparent)]
     #[diagnostic(transparent)]
